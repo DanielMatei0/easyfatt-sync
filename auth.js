@@ -57,7 +57,7 @@ function tokenPath() {
 function loadOAuthCredentials() {
   if (!fs.existsSync(CREDENTIALS_PATH)) {
     throw new Error(
-      "File oauth_credentials.json mancante. Contatta Aven Labs: non serve creare credenziali Google Cloud."
+      "Credenziali Google OAuth mancanti. Configura oauth_credentials.json."
     );
   }
 

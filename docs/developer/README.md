@@ -208,6 +208,8 @@ Moduli: `support.js`, `supportConstants.js`, `supportIssueTypes.js`.
 
 ```
 easyfatt-sync-app/
+├── oauth_credentials.example.json  # Template OAuth (committato, senza secret)
+├── oauth_credentials.json          # Credenziali reali (gitignored, solo locale/build)
 ├── main.js                 # Entry Electron, IPC, lifecycle
 ├── preload.js              # Bridge sicuro renderer ↔ main
 ├── auth.js                 # OAuth Google, token file
@@ -277,20 +279,36 @@ cd easyfatt-sync-app
 npm install
 ```
 
-### OAuth in sviluppo
+### Configurazione credenziali OAuth
 
-Copia il file credenziali OAuth Desktop nella root (vedi [§5](#5-google-oauth-setup)):
+Il file reale **`oauth_credentials.json` non deve essere committato** nel repository pubblico.
 
-```
-easyfatt-sync-app/oauth_credentials.json   # gitignored
-```
+**Setup locale (sviluppo e build):**
 
-Il token si crea al primo “Collega Google” nell’app:
+1. Copia il template:
+   ```bash
+   cp oauth_credentials.example.json oauth_credentials.json
+   ```
+2. Apri `oauth_credentials.json` e inserisci le credenziali del **OAuth Client Desktop App** del progetto Google Cloud ufficiale **Aven Labs** (`client_id`, `client_secret`, ecc.).
+3. Non committare il file reale: è già in `.gitignore`.
 
-```
-~/EasyfattSync/token.json                  # macOS/Linux
-%APPDATA%/EasyfattSync/token.json          # Windows
-```
+**Build produzione (installer Windows/macOS):**
+
+- Prima di `npm run dist:win` o `npm run dist:mac`, assicurati che `oauth_credentials.json` esista **nella root del progetto** sulla macchina di build.
+- electron-builder includerà il file nel pacchetto installato; ogni cliente finale **non** crea un progetto Google Cloud.
+
+**Token per utente (`token.json`):**
+
+- Generato **solo dopo** che l’utente clicca “Collega Google” nell’app installata.
+- Salvato in locale per macchina, **mai** nel repository:
+  - macOS/Linux: `~/EasyfattSync/token.json`
+  - Windows: `%APPDATA%/EasyfattSync/token.json`
+
+Se `oauth_credentials.json` manca, l’app mostra:
+
+> Credenziali Google OAuth mancanti. Configura oauth_credentials.json.
+
+Dettagli Google Cloud: [§5 Google OAuth setup](#5-google-oauth-setup). Sicurezza repository: [`SECURITY.md`](../../SECURITY.md).
 
 ### Avvio in sviluppo
 
@@ -306,16 +324,21 @@ Equivalente a `electron .` — **non** abilita auto-updater reale (messaggio dev
 | Script                   | Output                        |
 | ------------------------ | ----------------------------- |
 | `npm run dist:win`       | Installer NSIS x64 in `dist/` |
-| `npm run dist:mac`       | DMG ARM64 (Apple Silicon)     |
-| `npm run dist:mac:intel` | DMG x64 (Intel)               |
+| `npm run dist:mac`       | DMG ARM64 (Apple Silicon), senza firma/notarizzazione |
+| `npm run dist:mac:intel` | DMG x64 (Intel), senza firma/notarizzazione           |
+| `npm run icons:mac`      | Genera `assets/icon.icns`                             |
+| `npm run check`          | Controllo salute progetto (pre-build / pre-push)    |
 
-Guida passo-passo per l’installer Windows: **[build-windows.md](./build-windows.md)**.
+Guide build: **[build-windows.md](./build-windows.md)** · **[build-macos.md](./build-macos.md)** · [notarizzazione futura](./macos-notarization-future.md).
 
 Configurazione builder in `package.json` → sezione `"build"`:
 
 - `appId`: `com.avenlabs.easyfattsync`
 - `productName`: `Easyfatt Sync`
+- Windows: target **NSIS** (`oneClick: false`, scelta cartella, shortcut Desktop/Start, `assets/icon.ico`)
+- macOS: **DMG** con `assets/icon.icns`, `hardenedRuntime: false` (test); notarizzazione documentata in [macos-notarization-future.md](./macos-notarization-future.md)
 - `publish`: GitHub `DanielMatei0/easyfatt-sync`
+- `oauth_credentials.json`: incluso nel pacchetto se presente in root al build; **mai** in Git (`oauth_credentials.example.json` resta nel repo)
 
 ### Variabili ambiente
 
@@ -651,8 +674,8 @@ preload: path.join(__dirname, "preload.js"),
   npm run dist:mac:intel
   ```
 - Controllare artefatti in `dist/`:
-  - Installer `.exe` + `latest.yml` (Windows)
-  - `.dmg` + `latest-mac.yml` o equivalente (macOS)
+  - Windows: `Easyfatt Sync Setup X.Y.Z.exe`, `latest.yml`, `.exe.blockmap`
+  - macOS: `Easyfatt Sync-X.Y.Z-arm64.dmg`, `latest-mac.yml`, `.dmg.blockmap`
 - Creare tag Git: `git tag v1.0.1 && git push origin v1.0.1`
 - Creare **GitHub Release** dal tag.
 - Caricare **tutti** gli asset generati (incluso `latest.yml`).

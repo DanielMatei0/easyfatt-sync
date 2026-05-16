@@ -1,14 +1,44 @@
+# Dependencies
 node_modules/
-dist/
-.DS_Store
-*.log
 
-# Credenziali e token locali (non committare)
+# Secrets / OAuth (never commit)
 oauth_credentials.json
 token.json
 .env
 .env.local
+.env.production
+.env.*.local
 
-# Backend example env
+# Build output
+dist/
+release/
+out/
+*.dmg
+*.exe
+*.blockmap
+latest.yml
+latest-mac.yml
+
+# Local app data / backups
+*.easyfatt-sync-backup.json
+backups/
+*.backup.json
+
+# Logs
+*.log
+logs/
+
+# macOS icon build temp
+assets/icon.iconset/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+
+# Backend example (keep .env.example only)
 backend-examples/**/.env.local
-!backend-examples/**/.env.example
+
+# Safe templates (committed)
+# oauth_credentials.example.json
+# .env.example

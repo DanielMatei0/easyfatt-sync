@@ -52,6 +52,7 @@ docs/
 |---------|----------|
 | Codice applicazione | Root del progetto (`main.js`, `renderer/`, moduli Node) |
 | **Build installer Windows** | [`docs/developer/build-windows.md`](./developer/build-windows.md) |
+| **Build DMG macOS** | [`docs/developer/build-macos.md`](./developer/build-macos.md) |
 | Workflow aggiornamenti | [`UPDATES.md`](../UPDATES.md) |
 | Privacy (testo legale) | [`legal/privacy-easyfatt-sync.md`](../legal/privacy-easyfatt-sync.md) |
 | Termini (testo legale) | [`legal/terms-easyfatt-sync.md`](../legal/terms-easyfatt-sync.md) |

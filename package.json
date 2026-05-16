@@ -5,29 +5,69 @@
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
-  "dist:win": "electron-builder --win nsis --x64",
-  "dist:mac": "electron-builder --mac dmg --arm64",
-  "dist:mac:intel": "electron-builder --mac dmg --x64"
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --arm64",
+    "dist:mac:intel": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --x64",
+    "check": "node scripts/health-check.js",
+    "security:check": "node scripts/security-check.js",
+    "icons:win": "node scripts/generate-icon-ico.js",
+    "icons:mac": "bash scripts/generate-icon-icns.sh"
   },
   "build": {
     "appId": "com.avenlabs.easyfattsync",
     "productName": "Easyfatt Sync",
-    "icon": "assets/icon.png",
+    "copyright": "Copyright © Aven Labs",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "assets"
     },
     "files": [
       "**/*",
-      "!**/.DS_Store"
+      "!dist/**",
+      "!docs/**",
+      "!docs-pdf/**",
+      "!backend-examples/**",
+      "!**/.DS_Store",
+      "!**/.git/**",
+      "!oauth_credentials.example.json",
+      "!**/*.easyfatt-sync-backup.json",
+      "!token.json",
+      "!**/*.log"
     ],
+    "asar": true,
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.png"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Easyfatt Sync",
+      "uninstallDisplayName": "Easyfatt Sync",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false
     },
     "mac": {
       "target": "dmg",
+      "icon": "assets/icon.icns",
       "category": "public.app-category.business",
-      "icon": "assets/icon.png"
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "Easyfatt Sync"
     },
     "publish": [
       {

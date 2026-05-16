@@ -77,7 +77,13 @@ Scarica l’installer dalla pagina o dal link fornito da **Aven Labs** (sito o e
 1. Apri il file `.dmg`.
 2. Trascina **Easyfatt Sync** nella cartella **Applicazioni**.
 3. Apri l’app da Applicazioni.
-4. Se macOS chiede conferma per un’app non identificata, segui le istruzioni di sistema (Preferenze di sistema → Privacy e sicurezza).
+
+Se macOS segnala **«sviluppatore non identificato»** (normale per versioni beta non notarizzate):
+
+- **Tasto destro** su **Easyfatt Sync** in Applicazioni → **Apri** → nel dialogo clicca di nuovo **Apri**, oppure
+- **Impostazioni di Sistema** → **Privacy e sicurezza** → **Apri comunque** (compare dopo il primo tentativo bloccato).
+
+Le versioni ufficiali future, una volta notarizzate da Aven Labs, non richiederanno questo passaggio.
 
 ### Primo avvio
 

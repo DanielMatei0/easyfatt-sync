@@ -30,13 +30,21 @@ Risultato tipico nella cartella `dist/`:
 
 | File | Uso |
 |------|-----|
-| `Easyfatt Sync Setup X.Y.Z.exe` | Installer per i clienti (setup guidato) |
+| `Easyfatt Sync Setup X.Y.Z.exe` | Installer per i clienti (setup guidato NSIS) |
 | `latest.yml` | Metadati per **electron-updater** (aggiornamenti automatici) |
-| `*.exe.blockmap` | Delta update (se generato) |
+| `Easyfatt Sync Setup X.Y.Z.exe.blockmap` | Delta update |
 | Cartella `win-unpacked/` | App “portable” non installata (utile per debug) |
 
+Esempio con `version: "1.0.0"` in `package.json`:
+
+```text
+dist/Easyfatt Sync Setup 1.0.0.exe
+dist/latest.yml
+dist/Easyfatt Sync Setup 1.0.0.exe.blockmap
+```
+
 - **Architettura:** solo **64 bit** (`x64`).
-- **Formato installer:** **NSIS** (Next-Step Installer), configurato in `package.json` → `build.win.target`.
+- **Formato installer:** **NSIS** con wizard (non one-click): scelta cartella, collegamento Desktop, menu Start, icona `assets/icon.ico`.
 
 ---
 
@@ -52,7 +60,7 @@ Risultato tipico nella cartella `dist/`:
 | Spazio disco | Almeno 2–3 GB liberi (`node_modules` + `dist`) |
 | Rete | Per `npm install` e download Electron |
 
-> Puoi provare build Windows anche da macOS con wine/cross-compile, ma per produzione Aven Labs è preferibile una **VM o PC Windows** dedicato.
+> **Build Windows da Mac (soprattutto Apple Silicon):** spesso fallisce con errori Wine/NSIS (`bad CPU type in executable`, toolchain mancante). Per produzione usa un **PC Windows 10/11** o **GitHub Actions** con runner `windows-latest`. La build macOS (`npm run dist:mac`) resta su Mac.
 
 ### Account e file riservati
 
@@ -115,9 +123,17 @@ git status
 
 In `package.json`:
 
-- **`version`** — numero versione dell’installer (es. `1.0.1`).
+- **`version`** — numero versione dell’installer (es. `1.0.1` → file `Easyfatt Sync Setup 1.0.1.exe`).
 - **`build.productName`** — nome visibile: `Easyfatt Sync`.
-- **`build.win.icon`** — `assets/icon.png` (consigliato 256×256 o superiore).
+- **`build.win.icon`** — `assets/icon.ico` (richiesto per NSIS; generato da PNG).
+
+Se manca `assets/icon.ico`:
+
+```bash
+npm run icons:win
+```
+
+Vedi [`assets/README.md`](../../assets/README.md). Senza `.ico` electron-builder può fallire o usare un’icona generica: controlla l’output prima di distribuire.
 
 ### 3.5 (Opzionale) Test in sviluppo
 
@@ -195,7 +211,7 @@ Senza `latest.yml` sulla release, l’app installata non rileverà correttamente
 Checklist consigliata su un PC Windows pulito (o VM):
 
 1. Esegui il file `Easyfatt Sync Setup X.Y.Z.exe`.
-2. Completa il wizard (percorso installazione, collegamento desktop se proposto).
+2. Completa il wizard NSIS: scegli cartella, conferma collegamento **Desktop** e **menu Start** (entrambi abilitati in `package.json` → `build.nsis`).
 3. Avvia **Easyfatt Sync** dal menu Start.
 4. Accetta **Privacy e Termini** al primo avvio.
 5. **Collega Google** e completa OAuth nel browser.
@@ -213,20 +229,14 @@ L’app mostra la versione in interfaccia (footer/impostazioni), allineata a `pa
 
 Per distribuire aggiornamenti via **electron-updater** (GitHub Releases):
 
-1. Incrementa `version` in `package.json`.
-2. Esegui di nuovo `npm run dist:win`.
-3. Crea un tag Git, es. `v1.0.1`.
-4. Crea una **GitHub Release** sul repo configurato in `package.json`:
-
-   ```json
-   "publish": [{
-     "provider": "github",
-     "owner": "DanielMatei0",
-     "repo": "easyfatt-sync"
-   }]
-   ```
-
-5. Allega **tutti** i file rilevanti da `dist/` (`.exe`, `latest.yml`, `.blockmap`).
+1. Incrementa `version` in `package.json` (es. `1.0.0` → `1.0.1`).
+2. Su **Windows**: `npm install` → `npm run dist:win`.
+3. Crea tag Git `v1.0.1` e push: `git tag v1.0.1 && git push origin v1.0.1`.
+4. Crea una **GitHub Release** sul repo `DanielMatei0/easyfatt-sync` (config in `package.json` → `build.publish`).
+5. Carica **obbligatoriamente** da `dist/`:
+   - `Easyfatt Sync Setup 1.0.1.exe`
+   - `latest.yml`
+   - `Easyfatt Sync Setup 1.0.1.exe.blockmap`
 
 Dettagli: [`UPDATES.md`](../../UPDATES.md) e [Workflow release](./README.md#11-workflow-release).
 

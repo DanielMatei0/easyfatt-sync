@@ -8,16 +8,17 @@
 ## Workflow release
 
 1. Incrementare la versione in `package.json` (es. `1.0.1`).
-2. Eseguire la build Windows dalla macchina di build:
+2. Eseguire le build dalle macchine appropriate:
    ```bash
-   npm run dist:win
+   npm run dist:win          # Windows (o CI windows-latest)
+   npm run dist:mac          # macOS Apple Silicon
+   npm run dist:mac:intel    # macOS Intel (opzionale)
    ```
-   Vedi guida completa: [`docs/developer/build-windows.md`](docs/developer/build-windows.md).
+   Guide: [Windows](docs/developer/build-windows.md) · [macOS](docs/developer/build-macos.md).
 3. Creare una **GitHub Release** con tag uguale alla versione (es. `v1.0.1`).
 4. Allegare alla release i file generati in `dist/`, in particolare:
-   - installer NSIS (`.exe`)
-   - `latest.yml` (generato da electron-builder — necessario per electron-updater)
-   - eventuali file `.blockmap` se presenti
+   - **Windows:** installer NSIS (`.exe`), `latest.yml`, `.exe.blockmap`
+   - **macOS:** `.dmg`, `latest-mac.yml`, `.dmg.blockmap`
 5. L’app installata controllerà `latest.yml` sul repository configurato e proporrà l’aggiornamento all’utente.
 
 ## Comportamento in App
