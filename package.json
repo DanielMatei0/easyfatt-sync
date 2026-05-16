@@ -12,18 +12,22 @@
   "build": {
     "appId": "com.avenlabs.easyfattsync",
     "productName": "Easyfatt Sync",
+    "icon": "assets/icon.png",
     "directories": {
       "output": "dist"
     },
     "files": [
-      "**/*"
+      "**/*",
+      "!**/.DS_Store"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icon.png"
     },
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.business"
+      "category": "public.app-category.business",
+      "icon": "assets/icon.png"
     },
     "publish": [
       {

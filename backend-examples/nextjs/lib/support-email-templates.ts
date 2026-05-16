@@ -23,6 +23,8 @@ export type SupportRequestPayload = {
 const BRAND_ORANGE = "#ff7a00";
 const BRAND_DARK = "#14161a";
 const BRAND_MUTED = "#606674";
+const PRIVACY_URL = "https://aven-labs.com/privacy/easyfatt-sync";
+const TERMS_URL = "https://aven-labs.com/terms/easyfatt-sync";
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "")
@@ -53,7 +55,58 @@ function formatPlatform(payload: SupportRequestPayload): string {
   return payload.platform;
 }
 
-function emailShell(title: string, body: string): string {
+function buildPrivacyFooterBlock(): string {
+  return `<div style="margin-top:22px;padding-top:18px;border-top:1px solid #e8ebf2;">
+    <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${BRAND_MUTED};">Trattamento dei dati</p>
+    <p style="margin:0 0 10px;font-size:12px;line-height:1.6;color:${BRAND_MUTED};">
+      I dati che ci hai fornito (nome, email, telefono se indicato e contenuto della richiesta) sono trattati da
+      <strong style="color:${BRAND_DARK};">Aven Labs</strong> al solo fine di gestire e rispondere alla tua richiesta di assistenza
+      relativa a <strong style="color:${BRAND_DARK};">Easyfatt Sync</strong>. Non li utilizziamo per finalità diverse senza una base giuridica adeguata.
+    </p>
+    <p style="margin:0;font-size:12px;line-height:1.6;color:${BRAND_MUTED};">
+      Per maggiori informazioni su diritti, conservazione e responsabile del trattamento, consulta la
+      <a href="${PRIVACY_URL}" style="color:${BRAND_ORANGE};text-decoration:underline;">Privacy Policy</a>
+      e i
+      <a href="${TERMS_URL}" style="color:${BRAND_ORANGE};text-decoration:underline;">Termini di utilizzo</a>.
+    </p>
+  </div>`;
+}
+
+function buildEmailOuterFooter(includePrivacyLinks: boolean): string {
+  if (!includePrivacyLinks) {
+    return `<p style="margin:16px 0 0;font-size:12px;color:${BRAND_MUTED};text-align:center;">
+      Aven Labs — Soluzioni digitali per aziende ·
+      <a href="https://aven-labs.com" style="color:${BRAND_ORANGE};">aven-labs.com</a>
+    </p>`;
+  }
+
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;margin-top:16px;">
+    <tr>
+      <td style="padding:14px 16px;background:#ffffff;border:1px solid #e8ebf2;border-radius:10px;text-align:center;">
+        <p style="margin:0 0 6px;font-size:12px;color:${BRAND_DARK};font-weight:600;">Aven Labs — Soluzioni digitali per aziende</p>
+        <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:${BRAND_MUTED};">
+          Titolare del trattamento: Aven Labs ·
+          <a href="mailto:support@aven-labs.com" style="color:${BRAND_ORANGE};">support@aven-labs.com</a>
+        </p>
+        <p style="margin:0;font-size:11px;line-height:1.5;color:${BRAND_MUTED};">
+          <a href="${PRIVACY_URL}" style="color:${BRAND_ORANGE};text-decoration:underline;">Privacy Policy</a>
+          &nbsp;·&nbsp;
+          <a href="${TERMS_URL}" style="color:${BRAND_ORANGE};text-decoration:underline;">Termini di utilizzo</a>
+          &nbsp;·&nbsp;
+          <a href="https://aven-labs.com" style="color:${BRAND_ORANGE};text-decoration:underline;">aven-labs.com</a>
+        </p>
+      </td>
+    </tr>
+  </table>`;
+}
+
+function emailShell(
+  title: string,
+  body: string,
+  options: { clientConfirmation?: boolean } = {}
+): string {
+  const clientConfirmation = options.clientConfirmation === true;
+
   return `<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -76,7 +129,7 @@ function emailShell(title: string, body: string): string {
             <td style="padding:28px;">${body}</td>
           </tr>
         </table>
-        <p style="margin:16px 0 0;font-size:12px;color:${BRAND_MUTED};">Aven Labs — Soluzioni digitali per aziende · <a href="https://aven-labs.com" style="color:${BRAND_ORANGE};">aven-labs.com</a></p>
+        ${buildEmailOuterFooter(clientConfirmation)}
       </td>
     </tr>
   </table>
@@ -152,14 +205,15 @@ export function buildSupportConfirmationEmail(payload: SupportRequestPayload) {
     <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">
       Ti risponderemo il prima possibile all’indirizzo <strong>${escapeHtml(payload.email)}</strong>.
     </p>
-    <p style="margin:0;font-size:14px;line-height:1.6;color:${BRAND_MUTED};">
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:${BRAND_MUTED};">
       Se non hai inviato tu questa richiesta, puoi ignorare questa email o contattarci su
       <a href="mailto:support@aven-labs.com" style="color:${BRAND_ORANGE};">support@aven-labs.com</a>.
     </p>
+    ${buildPrivacyFooterBlock()}
   `;
 
   return {
     subject,
-    html: emailShell("Conferma richiesta supporto", body),
+    html: emailShell("Conferma richiesta supporto", body, { clientConfirmation: true }),
   };
 }

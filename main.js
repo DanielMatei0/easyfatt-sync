@@ -17,10 +17,12 @@ const {
   installUpdateNow,
 } = require("./updater");
 const { submitSupportRequest, getPlatformLabel } = require("./support");
+const { applyOpenAtLoginSetting } = require("./loginSettings");
 
 const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 
 const store = new Store();
+const APP_ICON_PATH = path.join(__dirname, "assets", "icon.png");
 
 let mainWindow;
 
@@ -30,6 +32,7 @@ function createWindow() {
     height: 800,
     minWidth: 960,
     minHeight: 640,
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
     },
@@ -70,8 +73,13 @@ function scheduleStartupUpdateCheck() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(APP_ICON_PATH);
+  }
+
   createWindow();
   const config = store.get("config") || getDefaultConfig();
+  applyOpenAtLoginSetting(config.openAtLogin, sendLog);
   restartScheduler(config);
   scheduleStartupUpdateCheck();
 });
@@ -83,9 +91,7 @@ ipcMain.handle("get-config", () => {
 ipcMain.handle("save-config", async (_, config) => {
   const merged = mergeConfig(store, config);
 
-  app.setLoginItemSettings({
-    openAtLogin: !!merged.openAtLogin,
-  });
+  applyOpenAtLoginSetting(merged.openAtLogin, sendLog);
 
   restartScheduler(merged);
   sendConfigUpdated(merged);
