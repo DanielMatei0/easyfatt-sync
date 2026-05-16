@@ -1375,3 +1375,66 @@ input:focus, textarea:focus {
   margin-top: 8px;
   margin-bottom: 0;
 }
+
+.backup-intro {
+  margin: 0 0 14px;
+}
+
+.backup-google-check {
+  margin-bottom: 8px;
+}
+
+.backup-warning {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  border-radius: var(--radius-md);
+  background: var(--status-busy-bg);
+  color: var(--status-busy-text);
+}
+
+.backup-warning[hidden] {
+  display: none !important;
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+
+.backup-status-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.backup-restore-hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.backup-section-title {
+  margin: 20px 0 12px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.backup-section-title:first-of-type {
+  margin-top: 0;
+}
+
+#automaticBackupFields select {
+  width: 100%;
+  max-width: 280px;
+}
+
+#automaticBackupRetention {
+  max-width: 120px;
+}

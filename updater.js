@@ -15,6 +15,7 @@ let autoUpdaterInstance = null;
 let updateReady = false;
 let updateAvailable = false;
 let pendingVersion = null;
+let listenersRegistered = false;
 
 function getAutoUpdater() {
   if (!app.isPackaged) {
@@ -36,7 +37,6 @@ function emitUpdate(payload) {
   const event = { ...payload };
 
   mainWindowRef.webContents.send("update-state", event);
-  mainWindowRef.webContents.send("update-status", event);
 
   if (event.state === "downloading" && event.percent != null) {
     mainWindowRef.webContents.send("update-progress", {
@@ -56,6 +56,11 @@ function initAutoUpdater(mainWindow) {
     return;
   }
 
+  if (listenersRegistered) {
+    return;
+  }
+
+  listenersRegistered = true;
   autoUpdater.logger = log;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;

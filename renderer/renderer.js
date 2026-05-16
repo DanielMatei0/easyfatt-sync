@@ -43,6 +43,28 @@ const supportCloseBtn = document.getElementById("supportCloseBtn");
 const supportSuccessPanel = document.getElementById("supportSuccessPanel");
 const openSupportBtn = document.getElementById("openSupportBtn");
 
+const backupIncludeGoogle = document.getElementById("backupIncludeGoogle");
+const backupGoogleWarning = document.getElementById("backupGoogleWarning");
+const backupCreateBtn = document.getElementById("backupCreateBtn");
+const backupRestoreBtn = document.getElementById("backupRestoreBtn");
+const backupStatusText = document.getElementById("backupStatusText");
+const backupRestoreModal = document.getElementById("backupRestoreModal");
+const backupRestoreModalHint = document.getElementById("backupRestoreModalHint");
+const backupRestoreCancelBtn = document.getElementById("backupRestoreCancelBtn");
+const backupRestoreConfirmBtn = document.getElementById("backupRestoreConfirmBtn");
+
+const automaticBackupEnabledInput = document.getElementById("automaticBackupEnabled");
+const automaticBackupFrequencyInput = document.getElementById("automaticBackupFrequency");
+const automaticBackupTimeInput = document.getElementById("automaticBackupTime");
+const automaticBackupFolderInput = document.getElementById("automaticBackupFolder");
+const automaticBackupBrowseBtn = document.getElementById("automaticBackupBrowseBtn");
+const automaticBackupRetentionInput = document.getElementById("automaticBackupRetention");
+const automaticBackupIncludeGoogleInput = document.getElementById("automaticBackupIncludeGoogle");
+const automaticBackupGoogleWarning = document.getElementById("automaticBackupGoogleWarning");
+const automaticBackupFields = document.getElementById("automaticBackupFields");
+
+let pendingRestorePath = null;
+
 const SUPPORT_EMAIL = "support@aven-labs.com";
 const SUPPORT_FIELD_ERRORS = {
   name: document.getElementById("supportNameError"),
@@ -165,7 +187,31 @@ const LOG_ACTIVITY_RULES = [
     }),
   },
   {
-    test: /Impostazioni salvate|Privacy Policy e Termini accettati|Account Google disconnesso|Monitoraggio file attivo|Sync programmata attiva|Promemoria sync mancante attivo/i,
+    test: /^Backup automatico creato$/i,
+    map: () => ({
+      type: "success",
+      title: "Backup automatico creato",
+      description: "Le impostazioni sono state salvate nella cartella scelta.",
+    }),
+  },
+  {
+    test: /^Errore backup automatico:/i,
+    map: (m, msg) => ({
+      type: "error",
+      title: "Errore backup automatico",
+      description: msg.replace(/^Errore backup automatico:\s*/i, "").trim() || "Operazione non riuscita.",
+    }),
+  },
+  {
+    test: /Backup creato correttamente|Backup creato con collegamento Google incluso/i,
+    map: () => ({
+      type: "success",
+      title: "Backup creato",
+      description: "Le impostazioni sono state esportate nel file scelto.",
+    }),
+  },
+  {
+    test: /Impostazioni salvate|Privacy Policy e Termini accettati|Account Google disconnesso|Monitoraggio file attivo|Sync programmata attiva|Promemoria sync mancante attivo|Backup automatico attivo/i,
     map: (m, msg) => ({
       type: "success",
       title: "Operazione completata",
@@ -183,7 +229,7 @@ const LOG_ACTIVITY_RULES = [
     }),
   },
   {
-    test: /Sync già in corso/i,
+    test: /Sincronizzazione già in corso|Sync già in corso/i,
     map: () => ({
       type: "info",
       title: "Sincronizzazione già attiva",
@@ -298,6 +344,40 @@ function parseLogToActivity(message) {
   };
 }
 
+function createActivityElement(item) {
+  const row = document.createElement("article");
+  row.className = "activity-item";
+  row.dataset.type = item.type;
+
+  const icon = document.createElement("div");
+  icon.className = "activity-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.info;
+
+  const body = document.createElement("div");
+  body.className = "activity-body";
+
+  const title = document.createElement("h4");
+  title.className = "activity-item-title";
+  title.textContent = item.title;
+  body.appendChild(title);
+
+  if (item.description) {
+    const desc = document.createElement("p");
+    desc.className = "activity-item-desc";
+    desc.textContent = item.description;
+    body.appendChild(desc);
+  }
+
+  const timeEl = document.createElement("time");
+  timeEl.className = "activity-time";
+  timeEl.dateTime = item.iso || new Date().toISOString();
+  timeEl.textContent = item.time || formatActivityTime();
+
+  row.append(icon, body, timeEl);
+  return row;
+}
+
 function renderActivities() {
   if (!activityList || !activityEmpty) return;
 
@@ -310,45 +390,65 @@ function renderActivities() {
 
   activityEmpty.hidden = true;
 
+  const fragment = document.createDocumentFragment();
   activities.forEach((item) => {
-    const row = document.createElement("article");
-    row.className = "activity-item";
-    row.dataset.type = item.type;
-
-    const icon = document.createElement("div");
-    icon.className = "activity-icon";
-    icon.setAttribute("aria-hidden", "true");
-    icon.textContent = ACTIVITY_ICONS[item.type] || ACTIVITY_ICONS.info;
-
-    const body = document.createElement("div");
-    body.className = "activity-body";
-
-    const title = document.createElement("h4");
-    title.className = "activity-item-title";
-    title.textContent = item.title;
-
-    body.appendChild(title);
-
-    if (item.description) {
-      const desc = document.createElement("p");
-      desc.className = "activity-item-desc";
-      desc.textContent = item.description;
-      body.appendChild(desc);
-    }
-
-    const time = document.createElement("time");
-    time.className = "activity-time";
-    time.dateTime = item.iso || new Date().toISOString();
-    time.textContent = item.time || formatActivityTime();
-
-    row.append(icon, body, time);
-    activityList.appendChild(row);
+    fragment.appendChild(createActivityElement(item));
   });
+  activityList.appendChild(fragment);
+  activityList.scrollTop = 0;
+}
+
+function prependActivityToDom(entry) {
+  if (!activityList || !activityEmpty) return;
+
+  activityEmpty.hidden = true;
+  activityList.insertBefore(createActivityElement(entry), activityList.firstChild);
+
+  const items = activityList.querySelectorAll(".activity-item");
+  if (items.length > MAX_ACTIVITIES) {
+    items[items.length - 1].remove();
+  }
 
   activityList.scrollTop = 0;
 }
 
-function addActivity({ type, title, description, time }) {
+function updateFirstActivityInDom(entry) {
+  const first = activityList?.querySelector(".activity-item");
+  if (!first) {
+    prependActivityToDom(entry);
+    return;
+  }
+
+  first.dataset.type = entry.type;
+  const icon = first.querySelector(".activity-icon");
+  if (icon) icon.textContent = ACTIVITY_ICONS[entry.type] || ACTIVITY_ICONS.info;
+
+  const title = first.querySelector(".activity-item-title");
+  if (title) title.textContent = entry.title;
+
+  const desc = first.querySelector(".activity-item-desc");
+  if (entry.description) {
+    if (desc) {
+      desc.textContent = entry.description;
+    } else {
+      const body = first.querySelector(".activity-body");
+      const p = document.createElement("p");
+      p.className = "activity-item-desc";
+      p.textContent = entry.description;
+      body?.appendChild(p);
+    }
+  } else if (desc) {
+    desc.remove();
+  }
+
+  const timeEl = first.querySelector(".activity-time");
+  if (timeEl) {
+    timeEl.dateTime = entry.iso;
+    timeEl.textContent = entry.time;
+  }
+}
+
+function addActivity({ type, title, description, time }, options = {}) {
   const entry = {
     type: type || "info",
     title: title || "Aggiornamento",
@@ -359,10 +459,14 @@ function addActivity({ type, title, description, time }) {
 
   activities.unshift(entry);
   if (activities.length > MAX_ACTIVITIES) {
-    activities = activities.slice(0, MAX_ACTIVITIES);
+    activities.length = MAX_ACTIVITIES;
   }
 
-  renderActivities();
+  if (options.prependDom !== false && activityList) {
+    prependActivityToDom(entry);
+  } else {
+    renderActivities();
+  }
 }
 
 function clearActivities() {
@@ -398,13 +502,15 @@ function addLog(message) {
 
     const isSyncingLog = parsed.type === "syncing";
     if (isSyncingLog && activities[0]?.type === "syncing") {
-      activities[0] = {
+      const updated = {
         ...activities[0],
         title: parsed.title,
         description: parsed.description,
         time: formatActivityTime(),
+        iso: new Date().toISOString(),
       };
-      renderActivities();
+      activities[0] = updated;
+      updateFirstActivityInDom(updated);
     } else {
       addActivity(parsed);
     }
@@ -420,14 +526,27 @@ function applyTheme(theme) {
   return resolved;
 }
 
+function hasUnsavedChanges() {
+  if (!savedConfigSnapshot) return false;
+  return configSnapshot(getConfigFromForm()) !== savedConfigSnapshot;
+}
+
 function setSyncBusy(busy) {
   isSyncing = busy;
   syncBtn.disabled = busy;
   syncBtn.classList.toggle("is-busy", busy);
   syncBtnLabel.textContent = busy ? SYNC_LABEL_BUSY : SYNC_LABEL_IDLE;
 
+  if (saveBtn) saveBtn.disabled = busy;
+  if (browseBtn) browseBtn.disabled = busy;
+  if (backupCreateBtn) backupCreateBtn.disabled = busy;
+  if (backupRestoreBtn) backupRestoreBtn.disabled = busy;
+  if (authBtn) authBtn.disabled = busy;
+
   if (busy) {
     showSyncProgress("Sincronizzazione in corso...");
+  } else {
+    updateGoogleAuthUI();
   }
 }
 
@@ -449,6 +568,48 @@ function parseTimesList(value) {
     .split("\n")
     .map((v) => v.trim())
     .filter(Boolean);
+}
+
+function isValidHHMM(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || "").trim());
+  if (!match) return false;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
+function clampAutomaticBackupRetention(value) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed)) return 10;
+  return Math.max(1, Math.min(100, parsed));
+}
+
+function validateBackupConfig(config) {
+  if (!config.automaticBackupEnabled) return null;
+
+  if (!config.automaticBackupFolder?.trim()) {
+    return "Per il backup automatico indica la cartella destinazione.";
+  }
+
+  if (!isValidHHMM(config.automaticBackupTime)) {
+    return "Inserisci un orario valido (HH:MM) per il backup automatico.";
+  }
+
+  const retention = Number(config.automaticBackupRetention);
+  if (!Number.isFinite(retention) || retention < 1 || retention > 100) {
+    return "Mantieni tra 1 e 100 backup automatici.";
+  }
+
+  return null;
+}
+
+function updateAutomaticBackupVisibility() {
+  if (!automaticBackupFields) return;
+  automaticBackupFields.classList.toggle(
+    "is-hidden",
+    !automaticBackupEnabledInput?.checked
+  );
 }
 
 function updateScheduleVisibility() {
@@ -520,6 +681,14 @@ function getConfigFromForm() {
     theme: document.body.dataset.theme || "dark",
     lastSyncAt: lastSyncAt || undefined,
     lastSyncRows: lastSyncRows != null ? lastSyncRows : undefined,
+    automaticBackupEnabled: !!automaticBackupEnabledInput?.checked,
+    automaticBackupFrequency: automaticBackupFrequencyInput?.value || "daily",
+    automaticBackupTime: automaticBackupTimeInput?.value.trim() || "20:00",
+    automaticBackupFolder: automaticBackupFolderInput?.value.trim() || "",
+    automaticBackupRetention: clampAutomaticBackupRetention(
+      automaticBackupRetentionInput?.value
+    ),
+    automaticBackupIncludeGoogleToken: !!automaticBackupIncludeGoogleInput?.checked,
   };
 }
 
@@ -536,6 +705,12 @@ function configSnapshot(config) {
     syncTimes: config.syncTimes || [],
     reminderTimes: config.reminderTimes || [],
     theme: config.theme || "dark",
+    automaticBackupEnabled: !!config.automaticBackupEnabled,
+    automaticBackupFrequency: config.automaticBackupFrequency || "daily",
+    automaticBackupTime: config.automaticBackupTime || "20:00",
+    automaticBackupFolder: config.automaticBackupFolder || "",
+    automaticBackupRetention: clampAutomaticBackupRetention(config.automaticBackupRetention),
+    automaticBackupIncludeGoogleToken: !!config.automaticBackupIncludeGoogleToken,
   });
 }
 
@@ -560,10 +735,34 @@ function setFormFromConfig(config) {
   missingSyncReminderEnabledInput.checked = config.missingSyncReminderEnabled !== false;
   syncTimesInput.value = (config.syncTimes || ["09:00", "13:00", "18:00"]).join("\n");
   reminderTimesInput.value = (config.reminderTimes || ["12:00", "19:00"]).join("\n");
+  if (automaticBackupEnabledInput) {
+    automaticBackupEnabledInput.checked = !!config.automaticBackupEnabled;
+  }
+  if (automaticBackupFrequencyInput) {
+    automaticBackupFrequencyInput.value = config.automaticBackupFrequency || "daily";
+  }
+  if (automaticBackupTimeInput) {
+    automaticBackupTimeInput.value = config.automaticBackupTime || "20:00";
+  }
+  if (automaticBackupFolderInput) {
+    automaticBackupFolderInput.value = config.automaticBackupFolder || "";
+  }
+  if (automaticBackupRetentionInput) {
+    automaticBackupRetentionInput.value = clampAutomaticBackupRetention(
+      config.automaticBackupRetention
+    );
+  }
+  if (automaticBackupIncludeGoogleInput) {
+    automaticBackupIncludeGoogleInput.checked = !!config.automaticBackupIncludeGoogleToken;
+  }
+  if (automaticBackupGoogleWarning) {
+    automaticBackupGoogleWarning.hidden = !automaticBackupIncludeGoogleInput?.checked;
+  }
   applySyncMeta(config);
   applyTheme(config.theme);
   updateScheduleVisibility();
   updateReminderVisibility();
+  updateAutomaticBackupVisibility();
   savedConfigSnapshot = configSnapshot(config);
   updateUnsavedState();
   updateQuickStats();
@@ -843,7 +1042,6 @@ function bindUpdatesUI() {
   };
 
   window.easyfattSync.onUpdateState(handleUpdateEvent);
-  window.easyfattSync.onUpdateStatus(handleUpdateEvent);
 
   window.easyfattSync.onUpdateProgress((payload) => {
     if (currentUpdateState === "downloading") {
@@ -955,6 +1153,232 @@ function setSupportModalVisible(visible) {
   }
 }
 
+async function refreshBackupStatusText() {
+  if (!backupStatusText) return;
+
+  try {
+    const meta = await window.easyfattSync.getBackupMeta();
+    const parts = [];
+
+    if (meta.lastCreatedAt) {
+      const when = formatDateTime(meta.lastCreatedAt);
+      if (when) parts.push(`Ultimo backup: ${when}`);
+    }
+
+    if (meta.lastRestoredAt) {
+      const when = formatDateTime(meta.lastRestoredAt);
+      if (when) parts.push(`Ultimo ripristino: ${when}`);
+    }
+
+    if (meta.lastAutomaticAt) {
+      const when = formatDateTime(meta.lastAutomaticAt);
+      if (when) parts.push(`Ultimo backup automatico: ${when}`);
+    }
+
+    backupStatusText.textContent = parts.length
+      ? parts.join(" · ")
+      : "Nessun backup o ripristino registrato in questa installazione.";
+  } catch {
+    backupStatusText.textContent = "—";
+  }
+}
+
+function setBackupRestoreModalVisible(visible) {
+  if (!backupRestoreModal) return;
+
+  backupRestoreModal.hidden = !visible;
+
+  if (visible) {
+    appShell?.classList.add("is-blocked");
+    document.body.classList.add("backup-restore-modal-open");
+    return;
+  }
+
+  pendingRestorePath = null;
+  if (backupRestoreModalHint) backupRestoreModalHint.textContent = "";
+
+  const supportOpen = supportModal && !supportModal.hidden;
+  const legalOpen = legalGate && !legalGate.hidden;
+  if (!supportOpen && !legalOpen) {
+    appShell?.classList.remove("is-blocked");
+  }
+
+  document.body.classList.remove("backup-restore-modal-open");
+}
+
+function bindBackupUI() {
+  if (!backupCreateBtn && !backupRestoreBtn) return;
+
+  backupIncludeGoogle?.addEventListener("change", () => {
+    if (backupGoogleWarning) {
+      backupGoogleWarning.hidden = !backupIncludeGoogle.checked;
+    }
+  });
+
+  automaticBackupEnabledInput?.addEventListener("change", () => {
+    updateAutomaticBackupVisibility();
+    updateUnsavedState();
+  });
+
+  automaticBackupIncludeGoogleInput?.addEventListener("change", () => {
+    if (automaticBackupGoogleWarning) {
+      automaticBackupGoogleWarning.hidden = !automaticBackupIncludeGoogleInput.checked;
+    }
+    updateUnsavedState();
+  });
+
+  automaticBackupBrowseBtn?.addEventListener("click", async () => {
+    const folder = await window.easyfattSync.selectBackupFolder();
+    if (folder && automaticBackupFolderInput) {
+      automaticBackupFolderInput.value = folder;
+      updateUnsavedState();
+    }
+  });
+
+  backupCreateBtn?.addEventListener("click", async () => {
+    backupCreateBtn.disabled = true;
+
+    try {
+      const result = await window.easyfattSync.createBackup({
+        includeGoogleToken: !!backupIncludeGoogle?.checked,
+      });
+
+      if (result.canceled) return;
+
+      if (!result.ok) {
+        const message = result.message || "Errore durante il backup. Riprova.";
+        setStatus(message, "error");
+        addActivity({
+          type: "error",
+          title: "Backup non creato",
+          description: message,
+        });
+        return;
+      }
+
+      setStatus("Backup creato correttamente.", "success");
+      addActivity({
+        type: "success",
+        title: "Backup creato",
+        description: "Le impostazioni sono state esportate nel file scelto.",
+      });
+      await refreshBackupStatusText();
+    } finally {
+      backupCreateBtn.disabled = false;
+    }
+  });
+
+  backupRestoreBtn?.addEventListener("click", async () => {
+    backupRestoreBtn.disabled = true;
+
+    try {
+      const preview = await window.easyfattSync.previewBackup();
+
+      if (preview.canceled) return;
+
+      if (!preview.ok) {
+        const message = preview.message || "File backup non valido.";
+        setStatus(message, "error");
+        addActivity({
+          type: "error",
+          title: "Backup non valido",
+          description: message,
+        });
+        return;
+      }
+
+      pendingRestorePath = preview.filePath;
+      const hints = [];
+
+      if (preview.createdAt) {
+        const when = formatDateTime(preview.createdAt);
+        if (when) hints.push(`Backup del ${when}.`);
+      }
+
+      if (preview.googleTokenIncluded) {
+        hints.push("Include il collegamento Google.");
+      } else {
+        hints.push("Dopo il ripristino dovrai ricollegare Google.");
+      }
+
+      if (backupRestoreModalHint) {
+        backupRestoreModalHint.textContent = hints.join(" ");
+      }
+
+      setBackupRestoreModalVisible(true);
+      setTimeout(() => backupRestoreConfirmBtn?.focus(), 50);
+    } finally {
+      backupRestoreBtn.disabled = false;
+    }
+  });
+
+  backupRestoreCancelBtn?.addEventListener("click", () => setBackupRestoreModalVisible(false));
+
+  backupRestoreModal?.addEventListener("click", (event) => {
+    if (event.target === backupRestoreModal) {
+      setBackupRestoreModalVisible(false);
+    }
+  });
+
+  backupRestoreConfirmBtn?.addEventListener("click", async () => {
+    if (!pendingRestorePath) {
+      setBackupRestoreModalVisible(false);
+      return;
+    }
+
+    backupRestoreConfirmBtn.disabled = true;
+
+    try {
+      const result = await window.easyfattSync.restoreBackup(pendingRestorePath);
+      setBackupRestoreModalVisible(false);
+
+      if (!result.ok) {
+        const message = result.message || "Errore durante il ripristino. Riprova.";
+        setStatus(message, "error");
+        addActivity({
+          type: "error",
+          title: "Ripristino non riuscito",
+          description: message,
+        });
+        return;
+      }
+
+      if (result.config) {
+        setFormFromConfig(result.config);
+      } else {
+        const config = await window.easyfattSync.getConfig();
+        setFormFromConfig(config);
+      }
+
+      const legalStatus = result.legalStatus || (await window.easyfattSync.getLegalStatus());
+      legalAccepted = !!legalStatus.accepted;
+      setLegalGateVisible(!legalAccepted);
+      await refreshGoogleStatus();
+
+      setStatus("Backup ripristinato. Le impostazioni sono state aggiornate.", "success");
+      addActivity({
+        type: "success",
+        title: "Backup ripristinato",
+        description: result.googleTokenIncluded
+          ? "Impostazioni e collegamento Google ripristinati."
+          : "Impostazioni ripristinate. Ricollega Google per sincronizzare.",
+      });
+      await refreshBackupStatusText();
+    } finally {
+      backupRestoreConfirmBtn.disabled = false;
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && backupRestoreModal && !backupRestoreModal.hidden) {
+      setBackupRestoreModalVisible(false);
+    }
+  });
+
+  updateAutomaticBackupVisibility();
+  refreshBackupStatusText();
+}
+
 function bindSupportModal() {
   if (!supportModal) return;
 
@@ -1053,7 +1477,13 @@ function bindFormListeners() {
     missingSyncReminderEnabledInput,
     syncTimesInput,
     reminderTimesInput,
-  ];
+    automaticBackupEnabledInput,
+    automaticBackupFrequencyInput,
+    automaticBackupTimeInput,
+    automaticBackupFolderInput,
+    automaticBackupRetentionInput,
+    automaticBackupIncludeGoogleInput,
+  ].filter(Boolean);
 
   inputs.forEach((el) => {
     el.addEventListener("input", () => {
@@ -1084,6 +1514,11 @@ window.easyfattSync.onLog((message) => {
 });
 
 window.easyfattSync.onConfigUpdated((config) => {
+  if (hasUnsavedChanges()) {
+    applySyncMeta(config);
+    updateQuickStats();
+    return;
+  }
   setFormFromConfig(config);
 });
 
@@ -1098,7 +1533,16 @@ browseBtn.addEventListener("click", async () => {
 
 saveBtn.addEventListener("click", async () => {
   try {
-    await window.easyfattSync.saveConfig(getConfigFromForm());
+    const nextConfig = getConfigFromForm();
+    const backupError = validateBackupConfig(nextConfig);
+    if (backupError) {
+      setStatus(backupError, "error");
+      addLog(backupError);
+      openAccordionItem(document.getElementById("trigger-backup")?.closest("[data-accordion-item]"));
+      return;
+    }
+
+    await window.easyfattSync.saveConfig(nextConfig);
     const config = await window.easyfattSync.getConfig();
     setFormFromConfig(config);
     setStatus("Le tue impostazioni sono state salvate.", "success");
@@ -1159,6 +1603,16 @@ syncBtn.addEventListener("click", async () => {
     await window.easyfattSync.saveConfig(getConfigFromForm());
     const result = await window.easyfattSync.syncNow();
 
+    if (result?.skipped) {
+      setStatus("Sincronizzazione già in corso.", "busy");
+      addActivity({
+        type: "info",
+        title: "Sincronizzazione già attiva",
+        description: "Un’altra sincronizzazione è già in corso.",
+      });
+      return;
+    }
+
     const config = await window.easyfattSync.getConfig();
     setFormFromConfig(config);
 
@@ -1190,6 +1644,7 @@ syncBtn.addEventListener("click", async () => {
   bindUpdatesUI();
   bindActivityUI();
   bindSupportModal();
+  bindBackupUI();
   renderActivities();
   await initAppVersion();
   await initLegalGate();

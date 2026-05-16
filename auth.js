@@ -36,6 +36,8 @@ const OAUTH_TIMEOUT_MS = 2 * 60 * 1000;
 
 let activeOAuthServer = null;
 let activeOAuthTimeout = null;
+let cachedAuthClient = null;
+let cachedTokenMtime = null;
 
 function appDataPath() {
   const base = process.env.APPDATA || process.env.HOME || __dirname;
@@ -130,17 +132,56 @@ function callbackHtml(success, message = "") {
 </html>`;
 }
 
-async function authorizeGoogle(log = console.log) {
+function invalidateAuthCache() {
+  cachedAuthClient = null;
+  cachedTokenMtime = null;
+}
+
+function persistRefreshedTokens(tokens) {
+  const existing = readGoogleToken() || {};
+  const merged = { ...existing, ...tokens };
+  writeGoogleToken(merged);
+  try {
+    cachedTokenMtime = fs.statSync(tokenPath()).mtimeMs;
+  } catch {
+    cachedTokenMtime = null;
+  }
+}
+
+async function authorizeGoogle(log = () => {}) {
   const TOKEN_PATH = tokenPath();
 
   if (!fs.existsSync(TOKEN_PATH)) {
+    invalidateAuthCache();
     throw new Error('Google non collegato. Clicca "Collega Google" nell\'app.');
+  }
+
+  const stat = fs.statSync(TOKEN_PATH);
+  if (cachedAuthClient && cachedTokenMtime === stat.mtimeMs) {
+    return cachedAuthClient;
   }
 
   const oAuth2Client = createOAuthClient("http://127.0.0.1");
   const token = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8"));
   oAuth2Client.setCredentials(token);
 
+  oAuth2Client.on("tokens", (tokens) => {
+    if (tokens) {
+      persistRefreshedTokens(tokens);
+    }
+  });
+
+  try {
+    await oAuth2Client.getAccessToken();
+  } catch {
+    invalidateAuthCache();
+    throw new Error(
+      'Collegamento Google scaduto o non valido. Clicca "Collega Google" per ricollegare l\'account.'
+    );
+  }
+
+  cachedAuthClient = oAuth2Client;
+  cachedTokenMtime = stat.mtimeMs;
   return oAuth2Client;
 }
 
@@ -161,7 +202,8 @@ async function startGoogleOAuthFlow(log = console.log) {
 
     const succeed = (tokens) => {
       stopOAuthServer();
-      fs.writeFileSync(tokenPath(), JSON.stringify(tokens, null, 2));
+      writeGoogleToken(tokens);
+      invalidateAuthCache();
       log("Account Google collegato correttamente.");
       resolve({ ok: true });
     };
@@ -250,6 +292,7 @@ function isGoogleAuthorized() {
 
 function logoutGoogle() {
   stopOAuthServer();
+  invalidateAuthCache();
   const TOKEN_PATH = tokenPath();
   if (fs.existsSync(TOKEN_PATH)) {
     fs.unlinkSync(TOKEN_PATH);
@@ -257,9 +300,26 @@ function logoutGoogle() {
   return { ok: true };
 }
 
+function readGoogleToken() {
+  const TOKEN_PATH = tokenPath();
+  if (!fs.existsSync(TOKEN_PATH)) {
+    return null;
+  }
+
+  return JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8"));
+}
+
+function writeGoogleToken(token) {
+  ensureAppData();
+  fs.writeFileSync(tokenPath(), JSON.stringify(token, null, 2));
+}
+
 module.exports = {
   authorizeGoogle,
   startGoogleOAuthFlow,
   isGoogleAuthorized,
   logoutGoogle,
+  tokenPath,
+  readGoogleToken,
+  writeGoogleToken,
 };

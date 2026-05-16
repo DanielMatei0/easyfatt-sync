@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("easyfattSync", {
   getConfig: () => ipcRenderer.invoke("get-config"),
   saveConfig: (config) => ipcRenderer.invoke("save-config", config),
   selectExcel: () => ipcRenderer.invoke("select-excel"),
+  selectBackupFolder: () => ipcRenderer.invoke("select-backup-folder"),
   connectGoogle: () => ipcRenderer.invoke("connect-google"),
   isGoogleAuthorized: () => ipcRenderer.invoke("is-google-authorized"),
   logoutGoogle: () => ipcRenderer.invoke("logout-google"),
@@ -22,6 +23,10 @@ contextBridge.exposeInMainWorld("easyfattSync", {
   downloadUpdate: () => ipcRenderer.invoke("download-update"),
   installUpdateNow: () => ipcRenderer.invoke("install-update-now"),
   submitSupportRequest: (form) => ipcRenderer.invoke("submit-support-request", form),
+  createBackup: (options) => ipcRenderer.invoke("backup-create", options),
+  previewBackup: (filePath) => ipcRenderer.invoke("backup-preview", filePath),
+  restoreBackup: (filePath) => ipcRenderer.invoke("backup-restore", filePath),
+  getBackupMeta: () => ipcRenderer.invoke("get-backup-meta"),
   onLog: (callback) => ipcRenderer.on("log", (_, message) => callback(message)),
   onConfigUpdated: (callback) =>
     ipcRenderer.on("config-updated", (_, config) => callback(config)),

@@ -8,7 +8,12 @@ const {
 } = require("./auth");
 const { startScheduler, stopScheduler, shouldStartScheduler } = require("./scheduler");
 const { runSync } = require("./syncRunner");
-const { mergeConfig, getDefaultConfig } = require("./syncState");
+const {
+  mergeConfig,
+  getDefaultConfig,
+  prepareConfigForScheduler,
+  canRunAutomatedSync,
+} = require("./syncState");
 const { LEGAL_VERSION } = require("./legalConstants");
 const {
   initAutoUpdater,
@@ -18,6 +23,13 @@ const {
 } = require("./updater");
 const { submitSupportRequest, getPlatformLabel } = require("./support");
 const { applyOpenAtLoginSetting } = require("./loginSettings");
+const {
+  buildSuggestedBackupFilename,
+  createBackup,
+  previewBackup,
+  restoreBackup,
+} = require("./backup");
+const { toClientMessage } = require("./errors");
 
 const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 
@@ -35,6 +47,9 @@ function createWindow() {
     icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
 
@@ -46,28 +61,32 @@ function createWindow() {
 }
 
 function sendLog(message) {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("log", message);
   }
 }
 
 function sendConfigUpdated(config) {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("config-updated", config);
   }
 }
 
 function restartScheduler(config) {
+  const prepared = prepareConfigForScheduler(config, sendLog);
   stopScheduler();
-  if (shouldStartScheduler(config)) {
-    startScheduler(config, sendLog, store, sendConfigUpdated);
+  if (shouldStartScheduler(prepared)) {
+    startScheduler(prepared, sendLog, store, sendConfigUpdated, app);
   }
+  return prepared;
 }
 
 function scheduleStartupUpdateCheck() {
+  if (!app.isPackaged) return;
+
   setTimeout(() => {
     checkForUpdates().catch((error) => {
-      sendLog(`Controllo aggiornamenti non riuscito: ${error.message}`);
+      sendLog(`Controllo aggiornamenti non riuscito: ${toClientMessage(error)}`);
     });
   }, AUTO_UPDATE_CHECK_DELAY_MS);
 }
@@ -79,9 +98,20 @@ app.whenReady().then(() => {
 
   createWindow();
   const config = store.get("config") || getDefaultConfig();
-  applyOpenAtLoginSetting(config.openAtLogin, sendLog);
-  restartScheduler(config);
+  const prepared = restartScheduler(config);
+  store.set("config", prepared);
+  applyOpenAtLoginSetting(prepared.openAtLogin, sendLog);
   scheduleStartupUpdateCheck();
+});
+
+app.on("before-quit", () => {
+  stopScheduler();
+});
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
 
 ipcMain.handle("get-config", () => {
@@ -90,11 +120,11 @@ ipcMain.handle("get-config", () => {
 
 ipcMain.handle("save-config", async (_, config) => {
   const merged = mergeConfig(store, config);
+  const prepared = restartScheduler(merged);
+  store.set("config", prepared);
 
-  applyOpenAtLoginSetting(merged.openAtLogin, sendLog);
-
-  restartScheduler(merged);
-  sendConfigUpdated(merged);
+  applyOpenAtLoginSetting(prepared.openAtLogin, sendLog);
+  sendConfigUpdated(prepared);
 
   return { ok: true };
 });
@@ -102,17 +132,32 @@ ipcMain.handle("save-config", async (_, config) => {
 ipcMain.handle("select-excel", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
-    filters: [
-      { name: "Excel", extensions: ["xlsx", "xls"] },
-    ],
+    filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
   });
 
   if (result.canceled) return null;
   return result.filePaths[0];
 });
 
+ipcMain.handle("select-backup-folder", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Seleziona cartella backup automatici",
+    properties: ["openDirectory", "createDirectory"],
+  });
+
+  if (result.canceled || !result.filePaths?.length) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
+
 ipcMain.handle("connect-google", async () => {
-  return await startGoogleOAuthFlow(sendLog);
+  try {
+    return await startGoogleOAuthFlow(sendLog);
+  } catch (error) {
+    throw new Error(toClientMessage(error, "google"));
+  }
 });
 
 ipcMain.handle("is-google-authorized", async () => {
@@ -126,15 +171,23 @@ ipcMain.handle("logout-google", async () => {
 ipcMain.handle("sync-now", async () => {
   const config = store.get("config") || getDefaultConfig();
 
-  if (!config?.excelPath || !config?.spreadsheetId || !config?.sheetName) {
+  if (!canRunAutomatedSync(config)) {
     throw new Error("Config incompleta: seleziona file Excel, Sheet ID e nome foglio.");
   }
 
-  const result = await runSync(config, sendLog, store);
-  const updated = store.get("config");
-  sendConfigUpdated(updated);
+  try {
+    const result = await runSync(config, sendLog, store);
 
-  return result;
+    if (result?.skipped) {
+      return { ok: true, rows: 0, skipped: true };
+    }
+
+    const updated = store.get("config");
+    sendConfigUpdated(updated);
+    return result;
+  } catch (error) {
+    throw new Error(toClientMessage(error, "sync"));
+  }
 });
 
 ipcMain.handle("get-legal-status", () => {
@@ -195,4 +248,101 @@ ipcMain.handle("submit-support-request", async (_, form) => {
     excelPath: config.excelPath || "",
     sheetName: config.sheetName || "",
   });
+});
+
+ipcMain.handle("backup-create", async (_, options) => {
+  const saveResult = await dialog.showSaveDialog(mainWindow, {
+    title: "Salva backup Easyfatt Sync",
+    defaultPath: buildSuggestedBackupFilename(),
+    filters: [
+      {
+        name: "Backup Easyfatt Sync",
+        extensions: ["easyfatt-sync-backup", "json"],
+      },
+    ],
+  });
+
+  if (saveResult.canceled || !saveResult.filePath) {
+    return { ok: false, canceled: true };
+  }
+
+  const result = createBackup(
+    store,
+    app,
+    saveResult.filePath,
+    { ...options, backupType: "manual" },
+    sendLog
+  );
+
+  if (result.ok) {
+    const config = store.get("config") || getDefaultConfig();
+    sendConfigUpdated(config);
+  }
+
+  return result;
+});
+
+async function pickBackupFilePath() {
+  const openResult = await dialog.showOpenDialog(mainWindow, {
+    title: "Seleziona backup Easyfatt Sync",
+    properties: ["openFile"],
+    filters: [
+      {
+        name: "Backup Easyfatt Sync",
+        extensions: ["easyfatt-sync-backup", "json"],
+      },
+    ],
+  });
+
+  if (openResult.canceled || !openResult.filePaths?.length) {
+    return { ok: false, canceled: true };
+  }
+
+  return { ok: true, filePath: openResult.filePaths[0] };
+}
+
+ipcMain.handle("backup-preview", async (_, filePath) => {
+  let targetPath = filePath;
+
+  if (!targetPath) {
+    const picked = await pickBackupFilePath();
+    if (!picked.ok) return picked;
+    targetPath = picked.filePath;
+  }
+
+  return previewBackup(targetPath);
+});
+
+ipcMain.handle("backup-restore", async (_, filePath) => {
+  if (!filePath) {
+    return { ok: false, message: "Nessun file di backup selezionato." };
+  }
+
+  const result = restoreBackup(store, filePath, sendLog);
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const config = store.get("config") || getDefaultConfig();
+  applyOpenAtLoginSetting(config.openAtLogin, sendLog);
+  restartScheduler(config);
+  sendConfigUpdated(config);
+
+  return {
+    ...result,
+    legalStatus: {
+      accepted: store.get("legalAccepted") === true,
+      acceptedAt: store.get("legalAcceptedAt") || null,
+      version: store.get("legalVersion") || null,
+    },
+  };
+});
+
+ipcMain.handle("get-backup-meta", () => {
+  return {
+    lastCreatedAt: store.get("backupLastCreatedAt") || null,
+    lastRestoredAt: store.get("backupLastRestoredAt") || null,
+    lastAutomaticAt: store.get("backupLastAutomaticAt") || null,
+  };
 });

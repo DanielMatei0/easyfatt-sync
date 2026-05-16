@@ -57,9 +57,27 @@ function notifyMissingSyncReminder(time) {
   });
 }
 
+function notifyAutomaticBackupSuccess() {
+  return showNotification({
+    title: APP_TITLE,
+    body: "Backup automatico creato. Le impostazioni sono state salvate nella cartella scelta.",
+  });
+}
+
+function notifyAutomaticBackupError(message) {
+  const detail = message ? String(message).trim() : "operazione non riuscita.";
+
+  return showNotification({
+    title: `${APP_TITLE} — errore`,
+    body: `Backup automatico non riuscito. ${detail}`,
+  });
+}
+
 module.exports = {
   isNotificationSupported,
   notifySyncSuccess,
   notifySyncError,
   notifyMissingSyncReminder,
+  notifyAutomaticBackupSuccess,
+  notifyAutomaticBackupError,
 };
