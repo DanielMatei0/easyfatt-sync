@@ -10,8 +10,9 @@
 1. Incrementare la versione in `package.json` (es. `1.0.1`).
 2. Eseguire la build Windows dalla macchina di build:
    ```bash
-   npm run dist
+   npm run dist:win
    ```
+   Vedi guida completa: [`docs/developer/build-windows.md`](docs/developer/build-windows.md).
 3. Creare una **GitHub Release** con tag uguale alla versione (es. `v1.0.1`).
 4. Allegare alla release i file generati in `dist/`, in particolare:
    - installer NSIS (`.exe`)

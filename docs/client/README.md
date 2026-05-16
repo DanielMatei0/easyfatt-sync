@@ -45,13 +45,15 @@ In pratica, ogni volta che sincronizzi, il foglio Google riflette i dati più re
 
 Prima di iniziare, verifica di avere:
 
-| Requisito | Dettaglio |
-|-----------|-----------|
-| Sistema operativo | **Windows 10/11** oppure **macOS** (versione recente) |
-| Account Google | Gmail o Google Workspace con accesso a Google Sheets |
-| Easyfatt | Capacità di **esportare** l’elenco clienti in formato **Excel (.xlsx)** |
-| Google Sheet | Un foglio di calcolo già creato (o permesso di crearne uno) |
-| Connessione internet | Necessaria per Google e per eventuali aggiornamenti dell’app |
+
+| Requisito            | Dettaglio                                                               |
+| -------------------- | ----------------------------------------------------------------------- |
+| Sistema operativo    | **Windows 10/11** oppure **macOS** (versione recente)                   |
+| Account Google       | Gmail o Google Workspace con accesso a Google Sheets                    |
+| Easyfatt             | Capacità di **esportare** l’elenco clienti in formato **Excel (.xlsx)** |
+| Google Sheet         | Un foglio di calcolo già creato (o permesso di crearne uno)             |
+| Connessione internet | Necessaria per Google e per eventuali aggiornamenti dell’app            |
+
 
 ---
 
@@ -146,12 +148,14 @@ Clicca **Salva impostazioni** in fondo alla colonna impostazioni. Senza salvare,
 
 ### Altre opzioni utili
 
-| Opzione | Cosa fa |
-|---------|---------|
+
+| Opzione                   | Cosa fa                                                              |
+| ------------------------- | -------------------------------------------------------------------- |
 | Avvio con Windows / login | Apre l’app all’accensione del PC (se disponibile sulla tua versione) |
-| Tema chiaro/scuro | Cambia aspetto dell’interfaccia |
-| Monitoraggio file | Sync automatica quando il file Excel cambia |
-| Sync programmata | Sync a orari fissi (es. 09:00, 13:00, 18:00) |
+| Tema chiaro/scuro         | Cambia aspetto dell’interfaccia                                      |
+| Monitoraggio file         | Sync automatica quando il file Excel cambia                          |
+| Sync programmata          | Sync a orari fissi (es. 09:00, 13:00, 18:00)                         |
+
 
 ---
 
@@ -289,13 +293,15 @@ Indica:
 
 In sintesi:
 
-| Dato | Dove resta |
-|------|------------|
-| File Excel clienti | Sul **tuo computer** (percorso che scegli tu) |
-| Dati nel foglio Google | Nel **tuo Google Drive** / account Google |
-| Impostazioni app | Sul **tuo computer** (configurazione locale) |
-| Token Google (collegamento) | Sul **tuo computer**, cartella dedicata Easyfatt Sync |
-| Richiesta supporto | Inviata ad Aven Labs solo se compili il modulo supporto |
+
+| Dato                        | Dove resta                                              |
+| --------------------------- | ------------------------------------------------------- |
+| File Excel clienti          | Sul **tuo computer** (percorso che scegli tu)           |
+| Dati nel foglio Google      | Nel **tuo Google Drive** / account Google               |
+| Impostazioni app            | Sul **tuo computer** (configurazione locale)            |
+| Token Google (collegamento) | Sul **tuo computer**, cartella dedicata Easyfatt Sync   |
+| Richiesta supporto          | Inviata ad Aven Labs solo se compili il modulo supporto |
+
 
 Aven Labs non riceve automaticamente l’elenco dei tuoi clienti tramite la sincronizzazione.
 
@@ -321,11 +327,11 @@ Per i dettagli legali consulta **Privacy Policy** e **Termini** linkati nell’a
 
 **Controlla:**
 
-- [ ] Impostazioni **salvate**
-- [ ] Percorso **file Excel** corretto
-- [ ] **ID foglio Google** e **nome scheda** corretti
-- [ ] Google **collegato**
-- [ ] File Excel **esistente** (export fatto da Easyfatt)
+- Impostazioni **salvate**
+- Percorso **file Excel** corretto
+- **ID foglio Google** e **nome scheda** corretti
+- Google **collegato**
+- File Excel **esistente** (export fatto da Easyfatt)
 
 ---
 
@@ -381,11 +387,13 @@ Easyfatt o Excel potrebbero tenere il file aperto.
 
 ## 13. Contatti
 
-| Canale | Dettaglio |
-|--------|-----------|
+
+| Canale         | Dettaglio                                             |
+| -------------- | ----------------------------------------------------- |
 | Email supporto | [support@aven-labs.com](mailto:support@aven-labs.com) |
-| Sito | [aven-labs.com](https://aven-labs.com) |
-| Prodotto | Easyfatt Sync — Aven Labs |
+| Sito           | [aven-labs.com](https://aven-labs.com)                |
+| Prodotto       | Easyfatt Sync — Aven Labs                             |
+
 
 ---
 

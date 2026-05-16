@@ -1,0 +1,206 @@
+@page {
+  size: A4;
+  margin: 22mm 18mm 22mm 18mm;
+
+  @bottom-left {
+    content: "Aven Labs - Easyfatt Sync";
+    color: #8a8f98;
+    font-size: 9px;
+  }
+
+  @bottom-right {
+    content: counter(page);
+    color: #8a8f98;
+    font-size: 9px;
+  }
+}
+
+:root {
+  --accent: #ff7a00;
+  --ink: #14161a;
+  --muted: #656b76;
+  --soft: #f5f6f8;
+  --card: #ffffff;
+  --border: #e7e9ee;
+  --code-bg: #111318;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Arial, sans-serif;
+  color: var(--ink);
+  line-height: 1.62;
+  font-size: 10.6pt;
+}
+
+h1 {
+  font-size: 30pt;
+  line-height: 1.05;
+  letter-spacing: -1.2px;
+  margin: 0 0 14mm 0;
+  padding: 16mm 14mm;
+  color: #ffffff;
+  background: linear-gradient(135deg, #111318 0%, #1d222b 62%, #ff7a00 160%);
+  border-radius: 18px;
+}
+
+h2 {
+  font-size: 18pt;
+  letter-spacing: -0.45px;
+  margin-top: 12mm;
+  margin-bottom: 5mm;
+  padding-bottom: 2.5mm;
+  border-bottom: 2px solid var(--accent);
+  break-after: avoid;
+}
+
+h3 {
+  font-size: 13.5pt;
+  margin-top: 8mm;
+  margin-bottom: 3mm;
+  color: #222631;
+  break-after: avoid;
+}
+
+h4 {
+  font-size: 11.5pt;
+  margin-top: 6mm;
+  color: var(--accent);
+}
+
+p {
+  margin: 0 0 4mm 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+ul,
+ol {
+  margin-top: 2mm;
+  margin-bottom: 5mm;
+  padding-left: 7mm;
+}
+
+li {
+  margin-bottom: 1.8mm;
+}
+
+blockquote {
+  margin: 6mm 0;
+  padding: 4mm 5mm;
+  background: #fff7ef;
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  color: #3a2a1d;
+}
+
+code {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9.3pt;
+  background: #f0f2f5;
+  color: #111318;
+  padding: 1.2mm 1.8mm;
+  border-radius: 5px;
+}
+
+pre {
+  background: var(--code-bg);
+  color: #f7f7f8;
+  padding: 5mm;
+  border-radius: 14px;
+  font-size: 8.6pt;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  margin: 5mm 0;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6mm 0;
+  font-size: 9.5pt;
+  border: 1px solid var(--border);
+}
+
+th {
+  background: #111318;
+  color: #ffffff;
+  text-align: left;
+  padding: 3mm;
+}
+
+td {
+  padding: 3mm;
+  border-top: 1px solid var(--border);
+}
+
+tr:nth-child(even) td {
+  background: var(--soft);
+}
+
+hr {
+  border: none;
+  height: 1px;
+  background: var(--border);
+  margin: 10mm 0;
+}
+
+nav#TOC {
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 7mm;
+  margin: 8mm 0 12mm 0;
+  page-break-after: always;
+}
+
+nav#TOC::before {
+  content: "Indice";
+  display: block;
+  font-size: 18pt;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 4mm;
+  color: #111318;
+}
+
+nav#TOC ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+nav#TOC li {
+  margin: 2mm 0;
+}
+
+nav#TOC a {
+  color: #222631;
+  font-weight: 600;
+}
+
+img {
+  max-width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+
+strong {
+  font-weight: 750;
+}
+
+em {
+  color: var(--muted);
+}
+
+section {
+  break-inside: avoid;
+}

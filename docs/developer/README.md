@@ -32,29 +32,33 @@ Il cliente finale non configura Google Cloud: usa credenziali OAuth **centralizz
 
 ### Obiettivo software
 
-| Obiettivo | Descrizione |
-|-----------|-------------|
-| Affidabilità | Sync idempotente (clear + rewrite foglio), retry lettura Excel su file bloccato |
-| Semplicità | UI a impostazioni, senza terminale |
-| Automazione | Watch file, cron, promemoria, backup automatici |
-| Manutenibilità | Moduli Node separati, IPC tipizzati via preload |
-| Distribuzione | Installer Windows (NSIS) e DMG macOS, update via GitHub Releases |
+
+| Obiettivo      | Descrizione                                                                     |
+| -------------- | ------------------------------------------------------------------------------- |
+| Affidabilità   | Sync idempotente (clear + rewrite foglio), retry lettura Excel su file bloccato |
+| Semplicità     | UI a impostazioni, senza terminale                                              |
+| Automazione    | Watch file, cron, promemoria, backup automatici                                 |
+| Manutenibilità | Moduli Node separati, IPC tipizzati via preload                                 |
+| Distribuzione  | Installer Windows (NSIS) e DMG macOS, update via GitHub Releases                |
+
 
 ### Stack tecnologico
 
-| Layer | Tecnologia |
-|-------|------------|
-| Desktop shell | Electron 42.x |
-| Runtime | Node.js (bundled con Electron) |
-| UI | HTML / CSS / JavaScript vanilla (`renderer/`) |
-| Persistenza config | `electron-store` |
-| Excel | `xlsx` (lettura buffer async) |
-| Google | `googleapis` + OAuth 2.0 |
-| File watch | `chokidar` |
-| Scheduler | `node-cron` |
-| Build | `electron-builder` |
-| Auto-update | `electron-updater` + `electron-log` |
-| HTTP supporto | `fetch` nativo verso API Aven Labs |
+
+| Layer              | Tecnologia                                    |
+| ------------------ | --------------------------------------------- |
+| Desktop shell      | Electron 42.x                                 |
+| Runtime            | Node.js (bundled con Electron)                |
+| UI                 | HTML / CSS / JavaScript vanilla (`renderer/`) |
+| Persistenza config | `electron-store`                              |
+| Excel              | `xlsx` (lettura buffer async)                 |
+| Google             | `googleapis` + OAuth 2.0                      |
+| File watch         | `chokidar`                                    |
+| Scheduler          | `node-cron`                                   |
+| Build              | `electron-builder`                            |
+| Auto-update        | `electron-updater` + `electron-log`           |
+| HTTP supporto      | `fetch` nativo verso API Aven Labs            |
+
 
 **Piattaforme target:** Windows 10/11 (x64), macOS (ARM64 e Intel).
 
@@ -115,20 +119,22 @@ Espone un sottoinsieme sicuro di operazioni tramite `contextBridge.exposeInMainW
 
 ### IPC (canali principali)
 
-| Canale | Direzione | Funzione |
-|--------|-----------|----------|
-| `get-config` / `save-config` | R ↔ M | Lettura/scrittura config |
-| `select-excel` / `select-backup-folder` | R → M | Dialog file/cartella |
-| `connect-google` / `logout-google` / `is-google-authorized` | R ↔ M | OAuth |
-| `sync-now` | R → M | Sync manuale |
-| `backup-create` / `backup-preview` / `backup-restore` / `get-backup-meta` | R ↔ M | Backup |
-| `check-for-updates` / `download-update` / `install-update-now` | R ↔ M | Updater |
-| `submit-support-request` | R → M | Supporto |
-| `get-legal-status` / `accept-legal` | R ↔ M | Privacy/termini |
-| `open-external` | R → M | Link HTTPS nel browser di sistema |
-| `log` | M → R | Stream log attività |
-| `config-updated` | M → R | Refresh UI dopo sync/restore |
-| `update-state` / `update-progress` | M → R | Stato aggiornamenti |
+
+| Canale                                                                    | Direzione | Funzione                          |
+| ------------------------------------------------------------------------- | --------- | --------------------------------- |
+| `get-config` / `save-config`                                              | R ↔ M     | Lettura/scrittura config          |
+| `select-excel` / `select-backup-folder`                                   | R → M     | Dialog file/cartella              |
+| `connect-google` / `logout-google` / `is-google-authorized`               | R ↔ M     | OAuth                             |
+| `sync-now`                                                                | R → M     | Sync manuale                      |
+| `backup-create` / `backup-preview` / `backup-restore` / `get-backup-meta` | R ↔ M     | Backup                            |
+| `check-for-updates` / `download-update` / `install-update-now`            | R ↔ M     | Updater                           |
+| `submit-support-request`                                                  | R → M     | Supporto                          |
+| `get-legal-status` / `accept-legal`                                       | R ↔ M     | Privacy/termini                   |
+| `open-external`                                                           | R → M     | Link HTTPS nel browser di sistema |
+| `log`                                                                     | M → R     | Stream log attività               |
+| `config-updated`                                                          | M → R     | Refresh UI dopo sync/restore      |
+| `update-state` / `update-progress`                                        | M → R     | Stato aggiornamenti               |
+
 
 ### electron-store
 
@@ -236,18 +242,20 @@ easyfatt-sync-app/
 
 ### File principali (ruolo)
 
-| File | Ruolo |
-|------|--------|
-| `main.js` | Window, IPC, collegamento moduli, `restartScheduler` |
-| `preload.js` | API `window.easyfattSync` |
-| `auth.js` | OAuth loopback, read/write token, cache client |
-| `sync.js` | Lettura XLSX, clear/update Sheets |
-| `syncRunner.js` | Mutex sync, notifiche successo/errore |
-| `scheduler.js` | Automazioni temporizzate e watch file |
-| `backup.js` | Payload backup, restore, cleanup |
-| `updater.js` | Check/download/install release GitHub |
-| `support.js` | Validazione form + fetch API |
-| `renderer/renderer.js` | Logica UI, attività, form, modali |
+
+| File                   | Ruolo                                                |
+| ---------------------- | ---------------------------------------------------- |
+| `main.js`              | Window, IPC, collegamento moduli, `restartScheduler` |
+| `preload.js`           | API `window.easyfattSync`                            |
+| `auth.js`              | OAuth loopback, read/write token, cache client       |
+| `sync.js`              | Lettura XLSX, clear/update Sheets                    |
+| `syncRunner.js`        | Mutex sync, notifiche successo/errore                |
+| `scheduler.js`         | Automazioni temporizzate e watch file                |
+| `backup.js`            | Payload backup, restore, cleanup                     |
+| `updater.js`           | Check/download/install release GitHub                |
+| `support.js`           | Validazione form + fetch API                         |
+| `renderer/renderer.js` | Logica UI, attività, form, modali                    |
+
 
 ---
 
@@ -294,11 +302,14 @@ Equivalente a `electron .` — **non** abilita auto-updater reale (messaggio dev
 
 ### Script build
 
-| Script | Output |
-|--------|--------|
-| `npm run dist:win` | Installer NSIS x64 in `dist/` |
-| `npm run dist:mac` | DMG ARM64 (Apple Silicon) |
-| `npm run dist:mac:intel` | DMG x64 (Intel) |
+
+| Script                   | Output                        |
+| ------------------------ | ----------------------------- |
+| `npm run dist:win`       | Installer NSIS x64 in `dist/` |
+| `npm run dist:mac`       | DMG ARM64 (Apple Silicon)     |
+| `npm run dist:mac:intel` | DMG x64 (Intel)               |
+
+Guida passo-passo per l’installer Windows: **[build-windows.md](./build-windows.md)**.
 
 Configurazione builder in `package.json` → sezione `"build"`:
 
@@ -308,11 +319,13 @@ Configurazione builder in `package.json` → sezione `"build"`:
 
 ### Variabili ambiente
 
-| Variabile | Uso |
-|-----------|-----|
-| `GH_TOKEN` | Publish release su GitHub da CI o macchina build (electron-builder) |
-| `RESEND_API_KEY` | Solo backend supporto (Next.js), non nell’app Electron |
-| `APPDATA` / `HOME` | Path token utente (lettura in `auth.js`) |
+
+| Variabile          | Uso                                                                 |
+| ------------------ | ------------------------------------------------------------------- |
+| `GH_TOKEN`         | Publish release su GitHub da CI o macchina build (electron-builder) |
+| `RESEND_API_KEY`   | Solo backend supporto (Next.js), non nell’app Electron              |
+| `APPDATA` / `HOME` | Path token utente (lettura in `auth.js`)                            |
+
 
 File **non** committare (vedi `.gitignore`):
 
@@ -368,12 +381,14 @@ In produzione il file è **incluso nel pacchetto**; il cliente non crea un proge
 
 ### Sicurezza
 
-| Regola | Implementazione |
-|--------|-----------------|
-| Secret non nel renderer | Solo main process legge credenziali |
-| Token non in backup di default | Checkbox esplicita in UI backup |
-| Revoca | “Disconnetti Google” elimina `token.json` |
-| Messaggio scadenza | `errors.js` + refresh fallito → “Ricollega Google” |
+
+| Regola                         | Implementazione                                    |
+| ------------------------------ | -------------------------------------------------- |
+| Secret non nel renderer        | Solo main process legge credenziali                |
+| Token non in backup di default | Checkbox esplicita in UI backup                    |
+| Revoca                         | “Disconnetti Google” elimina `token.json`          |
+| Messaggio scadenza             | `errors.js` + refresh fallito → “Ricollega Google” |
+
 
 ---
 
@@ -436,11 +451,13 @@ Basato su **electron-updater** e release **GitHub**.
 
 ### Componenti
 
-| File | Ruolo |
-|------|--------|
-| `updater.js` | Listener `autoUpdater`, emit eventi UI |
-| `package.json` → `build.publish` | Provider GitHub |
-| `dist/latest.yml` | Metadati versione (generato da electron-builder) |
+
+| File                             | Ruolo                                            |
+| -------------------------------- | ------------------------------------------------ |
+| `updater.js`                     | Listener `autoUpdater`, emit eventi UI           |
+| `package.json` → `build.publish` | Provider GitHub                                  |
+| `dist/latest.yml`                | Metadati versione (generato da electron-builder) |
+
 
 ### Comportamento app
 
@@ -451,7 +468,7 @@ Basato su **electron-updater** e release **GitHub**.
 
 ### Release workflow (sintesi)
 
-Vedi anche [`UPDATES.md`](../../UPDATES.md) e [§11](#11-workflow-release).
+Vedi anche `[UPDATES.md](../../UPDATES.md)` e [§11](#11-workflow-release).
 
 1. Bump `version` in `package.json`.
 2. Build piattaforma target.
@@ -482,14 +499,16 @@ App Electron  --POST JSON-->  API Aven Labs  --Resend-->  Email interna + confer
 
 ### Payload (campi principali)
 
-| Campo | Note |
-|-------|------|
-| `name`, `email`, `message` | Obbligatori (validazione) |
-| `phone` | Opzionale |
-| `issueType` | Etichetta italiana da `supportIssueTypes.js` |
-| `appVersion`, `platform`, `platformLabel` | Contesto tecnico |
-| `lastSyncAt`, `lastSyncRows`, `googleAuthorized` | Diagnostica |
-| `excelPath`, `sheetName` | Config (attenzione privacy in email interna) |
+
+| Campo                                            | Note                                         |
+| ------------------------------------------------ | -------------------------------------------- |
+| `name`, `email`, `message`                       | Obbligatori (validazione)                    |
+| `phone`                                          | Opzionale                                    |
+| `issueType`                                      | Etichetta italiana da `supportIssueTypes.js` |
+| `appVersion`, `platform`, `platformLabel`        | Contesto tecnico                             |
+| `lastSyncAt`, `lastSyncRows`, `googleAuthorized` | Diagnostica                                  |
+| `excelPath`, `sheetName`                         | Config (attenzione privacy in email interna) |
+
 
 ### Backend di esempio
 
@@ -540,11 +559,13 @@ Nome automatico: `easyfatt-sync-backup-YYYY-MM-DD-HH-mm.json`
 }
 ```
 
-| Campo | Descrizione |
-|-------|-------------|
-| `backupType` | `"manual"` \| `"automatic"` — la rotazione elimina solo automatici |
-| `config` | Oggetto completo impostazioni electron-store |
-| `googleToken` | Presente solo se l’utente ha spuntato l’inclusione |
+
+| Campo         | Descrizione                                                       |
+| ------------- | ----------------------------------------------------------------- |
+| `backupType`  | `"manual"` | `"automatic"` — la rotazione elimina solo automatici |
+| `config`      | Oggetto completo impostazioni electron-store                      |
+| `googleToken` | Presente solo se l’utente ha spuntato l’inclusione                |
+
 
 **Non incluso:** file Excel, dati clienti nel foglio, log applicativi.
 
@@ -558,14 +579,16 @@ Nome automatico: `easyfatt-sync-backup-YYYY-MM-DD-HH-mm.json`
 
 ### Backup automatici
 
-| Impostazione | Default |
-|--------------|---------|
-| `automaticBackupEnabled` | `false` |
-| `automaticBackupFrequency` | `daily` \| `weekly` \| `monthly` |
-| `automaticBackupTime` | `20:00` |
-| `automaticBackupFolder` | `""` |
-| `automaticBackupRetention` | `10` |
-| `automaticBackupIncludeGoogleToken` | `false` |
+
+| Impostazione                        | Default                        |
+| ----------------------------------- | ------------------------------ |
+| `automaticBackupEnabled`            | `false`                        |
+| `automaticBackupFrequency`          | `daily` | `weekly` | `monthly` |
+| `automaticBackupTime`               | `20:00`                        |
+| `automaticBackupFolder`             | `""`                           |
+| `automaticBackupRetention`          | `10`                           |
+| `automaticBackupIncludeGoogleToken` | `false`                        |
+
 
 - Settimanale: lunedì all’orario indicato.
 - Mensile: primo giorno del mese.
@@ -594,11 +617,13 @@ preload: path.join(__dirname, "preload.js"),
 
 ### Token e credenziali
 
-| Asset | Posizione | Git |
-|-------|-----------|-----|
-| OAuth client secret | `oauth_credentials.json` | Ignorato |
+
+| Asset                | Posizione                 | Git      |
+| -------------------- | ------------------------- | -------- |
+| OAuth client secret  | `oauth_credentials.json`  | Ignorato |
 | Refresh/access token | `EasyfattSync/token.json` | Ignorato |
-| Config utente | electron-store (userData) | Locale |
+| Config utente        | electron-store (userData) | Locale   |
+
 
 ### API backend
 
@@ -616,23 +641,23 @@ preload: path.join(__dirname, "preload.js"),
 
 ### Checklist completa
 
-- [ ] Aggiornare `version` in `package.json` (es. `1.0.1`).
-- [ ] Aggiornare note di rilascio (CHANGELOG o body GitHub Release).
-- [ ] Verificare `build.publish` (owner/repo corretti).
-- [ ] Build:
+- Aggiornare `version` in `package.json` (es. `1.0.1`).
+- Aggiornare note di rilascio (CHANGELOG o body GitHub Release).
+- Verificare `build.publish` (owner/repo corretti).
+- Build:
   ```bash
   npm run dist:win    # su Windows o CI Windows
   npm run dist:mac    # su Mac ARM
   npm run dist:mac:intel
   ```
-- [ ] Controllare artefatti in `dist/`:
+- Controllare artefatti in `dist/`:
   - Installer `.exe` + `latest.yml` (Windows)
   - `.dmg` + `latest-mac.yml` o equivalente (macOS)
-- [ ] Creare tag Git: `git tag v1.0.1 && git push origin v1.0.1`
-- [ ] Creare **GitHub Release** dal tag.
-- [ ] Caricare **tutti** gli asset generati (incluso `latest.yml`).
-- [ ] Test su macchina pulita: install → avvio → check update → sync smoke test.
-- [ ] Comunicare agli utenti (email/newsletter se previsto).
+- Creare tag Git: `git tag v1.0.1 && git push origin v1.0.1`
+- Creare **GitHub Release** dal tag.
+- Caricare **tutti** gli asset generati (incluso `latest.yml`).
+- Test su macchina pulita: install → avvio → check update → sync smoke test.
+- Comunicare agli utenti (email/newsletter se previsto).
 
 ### Publish con token
 
@@ -655,14 +680,16 @@ In CI è preferibile usare GitHub Actions con secret `GH_TOKEN`.
 
 Roadmap indicativa (non impegnativa):
 
-| Priorità | Funzione | Note |
-|----------|----------|------|
-| Alta | Sync bidirezionale | Sheets → Excel o merge bidirezionale con conflict resolution |
-| Media | Multi-sheet | Più fogli Excel / più tab Sheets |
-| Media | Sync prodotti / fatture | Estensione modello dati oltre anagrafica clienti |
-| Bassa | Cloud dashboard | Stato sync centralizzato per rivenditori |
-| Bassa | Analytics | Metriche sync, errori aggregati (rispetto privacy) |
-| Bassa | Multi-utente | Account Aven Labs, config cloud, ruoli |
+
+| Priorità | Funzione                | Note                                                         |
+| -------- | ----------------------- | ------------------------------------------------------------ |
+| Alta     | Sync bidirezionale      | Sheets → Excel o merge bidirezionale con conflict resolution |
+| Media    | Multi-sheet             | Più fogli Excel / più tab Sheets                             |
+| Media    | Sync prodotti / fatture | Estensione modello dati oltre anagrafica clienti             |
+| Bassa    | Cloud dashboard         | Stato sync centralizzato per rivenditori                     |
+| Bassa    | Analytics               | Metriche sync, errori aggregati (rispetto privacy)           |
+| Bassa    | Multi-utente            | Account Aven Labs, config cloud, ruoli                       |
+
 
 Ogni voce richiede ADR, aggiornamento `backupVersion` se cambia schema, e revisione privacy.
 
@@ -672,37 +699,45 @@ Ogni voce richiede ADR, aggiornamento `backupVersion` se cambia schema, e revisi
 
 ### OAuth
 
-| Sintomo | Causa probabile | Azione |
-|---------|-----------------|--------|
-| `oauth_credentials.json mancante` | File non in root dev | Copiare credenziali Desktop da GCP |
-| Redirect error | Tipo client errato | Usare Desktop app, non Web senza URI |
-| `invalid_grant` | Token revocato/scaduto | Eliminare `token.json`, ricollegare |
-| Porta occupata | Server OAuth precedente | Riavviare app, chiudere processi Electron |
+
+| Sintomo                           | Causa probabile         | Azione                                    |
+| --------------------------------- | ----------------------- | ----------------------------------------- |
+| `oauth_credentials.json mancante` | File non in root dev    | Copiare credenziali Desktop da GCP        |
+| Redirect error                    | Tipo client errato      | Usare Desktop app, non Web senza URI      |
+| `invalid_grant`                   | Token revocato/scaduto  | Eliminare `token.json`, ricollegare       |
+| Porta occupata                    | Server OAuth precedente | Riavviare app, chiudere processi Electron |
+
 
 ### Sync
 
-| Sintomo | Causa probabile | Azione |
-|---------|-----------------|--------|
-| File in uso | Easyfatt tiene lock | Chiudere export; verificare retry in `sync.js` |
-| 0 righe | Foglio Excel vuoto o solo intestazione | Verificare export Easyfatt |
-| Permission denied Sheets | Account sbagliato / ID errato | Controllare `spreadsheetId` e permessi foglio |
-| Doppia sync | Race (raro post-mutex) | Verificare un solo job cron per orario |
+
+| Sintomo                  | Causa probabile                        | Azione                                         |
+| ------------------------ | -------------------------------------- | ---------------------------------------------- |
+| File in uso              | Easyfatt tiene lock                    | Chiudere export; verificare retry in `sync.js` |
+| 0 righe                  | Foglio Excel vuoto o solo intestazione | Verificare export Easyfatt                     |
+| Permission denied Sheets | Account sbagliato / ID errato          | Controllare `spreadsheetId` e permessi foglio  |
+| Doppia sync              | Race (raro post-mutex)                 | Verificare un solo job cron per orario         |
+
 
 ### Updater
 
-| Sintomo | Causa probabile | Azione |
-|---------|-----------------|--------|
-| “Solo versione installata” | `npm run dev` | Testare su build packaged |
-| Update non trovato | `latest.yml` mancante in release | Allegare YAML alla GitHub Release |
-| Download fallito | Rete / proxy aziendale | Log `electron-log`, test manuale URL release |
+
+| Sintomo                    | Causa probabile                  | Azione                                       |
+| -------------------------- | -------------------------------- | -------------------------------------------- |
+| “Solo versione installata” | `npm run dev`                    | Testare su build packaged                    |
+| Update non trovato         | `latest.yml` mancante in release | Allegare YAML alla GitHub Release            |
+| Download fallito           | Rete / proxy aziendale           | Log `electron-log`, test manuale URL release |
+
 
 ### Build
 
-| Sintomo | Piattaforma | Azione |
-|---------|-------------|--------|
-| NSIS fallisce | Windows | Path senza spazi, antivirus disabilitato per `dist/` |
-| DMG non si apre | macOS | Gatekeeper: firmare e notarizzare per distribuzione esterna |
-| Icona mancante | Tutte | Verificare `assets/icon.png` |
+
+| Sintomo         | Piattaforma | Azione                                                      |
+| --------------- | ----------- | ----------------------------------------------------------- |
+| NSIS fallisce   | Windows     | Path senza spazi, antivirus disabilitato per `dist/`        |
+| DMG non si apre | macOS       | Gatekeeper: firmare e notarizzare per distribuzione esterna |
+| Icona mancante  | Tutte       | Verificare `assets/icon.png`                                |
+
 
 ### Permessi file
 
@@ -719,7 +754,7 @@ Ogni voce richiede ADR, aggiornamento `backupVersion` se cambia schema, e revisi
 ## Contatti tecnici
 
 - **Supporto prodotto:** [support@aven-labs.com](mailto:support@aven-labs.com)
-- **Documentazione utente:** [`docs/client/README.md`](../client/README.md)
+- **Documentazione utente:** `[docs/client/README.md](../client/README.md)`
 
 ---
 
