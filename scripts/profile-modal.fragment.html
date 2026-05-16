@@ -1,0 +1,57 @@
+  <div id="profileModal" class="support-modal" hidden role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="support-modal-card profile-modal-card">
+      <h2 id="profile-modal-title" class="support-modal-title">Connessione sync</h2>
+      <p class="support-modal-desc">Collega un file Excel a un foglio Google Sheets.</p>
+      <form id="profileForm" class="support-form profile-form" novalidate>
+        <input type="hidden" id="profileId" value="" />
+        <div class="support-field">
+          <label class="field-label" for="profileName">Nome connessione</label>
+          <input id="profileName" type="text" placeholder="Es. Clienti Easyfatt" required />
+          <p id="profileNameError" class="field-error" hidden></p>
+        </div>
+        <div class="support-field">
+          <label class="field-label" for="profileExcelPath">File Excel</label>
+          <div class="row">
+            <input id="profileExcelPath" type="text" placeholder="C:\AvenSync\clienti.xlsx" autocomplete="off" />
+            <button type="button" id="profileBrowseBtn" class="btn btn-secondary">Sfoglia</button>
+          </div>
+          <p id="profileExcelError" class="field-error" hidden></p>
+        </div>
+        <div class="support-field">
+          <label class="field-label" for="profileSpreadsheetId">ID Google Sheet</label>
+          <input id="profileSpreadsheetId" type="text" placeholder="1AbCDef..." autocomplete="off" />
+          <p id="profileSpreadsheetError" class="field-error" hidden></p>
+        </div>
+        <div class="support-field">
+          <label class="field-label" for="profileSheetName">Nome scheda</label>
+          <input id="profileSheetName" type="text" placeholder="Clienti" autocomplete="off" />
+          <p id="profileSheetError" class="field-error" hidden></p>
+        </div>
+        <label class="check-item">
+          <input type="checkbox" id="profileEnabled" checked />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text"><span class="check-title">Profilo attivo</span><span class="check-desc">Disattiva per sospendere sync e automazioni</span></span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="profileWatchEnabled" />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text"><span class="check-title">Sync quando il file cambia</span><span class="check-desc">Aggiorna al salvataggio del file Excel</span></span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="profileScheduleEnabled" />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text"><span class="check-title">Sync programmata</span><span class="check-desc">Esegue la sync negli orari impostati</span></span>
+        </label>
+        <div id="profileScheduleFields" class="nested-fields">
+          <label class="field-label" for="profileSyncTimes">Orari sincronizzazione</label>
+          <textarea id="profileSyncTimes" placeholder="09:00&#10;13:00&#10;18:00"></textarea>
+          <p class="field-hint">Un orario per riga, formato HH:MM.</p>
+        </div>
+        <p id="profileFormError" class="field-error" hidden></p>
+        <div class="support-actions">
+          <button type="button" id="profileCancelBtn" class="btn btn-secondary">Annulla</button>
+          <button type="submit" id="profileSaveBtn" class="btn btn-primary">Salva connessione</button>
+        </div>
+      </form>
+    </div>
+  </div>

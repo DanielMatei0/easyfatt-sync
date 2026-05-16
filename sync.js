@@ -1,16 +1,10 @@
-const fs = require("fs/promises");
-const XLSX = require("xlsx");
-const { google } = require("googleapis");
 const { authorizeGoogle } = require("./auth");
+const { google } = require("googleapis");
 const { toClientMessage } = require("./errors");
 const { buildClearRange, buildUpdateRange } = require("./sheetRange");
-
-const EXCEL_READ_ATTEMPTS = 5;
-const EXCEL_READ_DELAY_MS = 800;
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const { validateExcelFile, readWorkbookWithRetry, sheetToRows } = require("./excelUtils");
+const { applyColumnMapping, hasActiveMapping } = require("./columnMapping");
+const { normalizeRows } = require("./diffEngine");
 
 function reportProgress(log, percent, message) {
   if (typeof log === "function") {
@@ -18,34 +12,16 @@ function reportProgress(log, percent, message) {
   }
 }
 
-async function readExcelWorkbook(excelPath) {
-  let lastError;
-
-  for (let attempt = 0; attempt < EXCEL_READ_ATTEMPTS; attempt += 1) {
-    try {
-      const buffer = await fs.readFile(excelPath);
-      return XLSX.read(buffer, { type: "buffer", cellDates: false });
-    } catch (error) {
-      lastError = error;
-      const retryable =
-        error.code === "EBUSY" ||
-        error.code === "EPERM" ||
-        error.code === "EACCES" ||
-        /EBUSY|EPERM|EACCES|locked|in use/i.test(error.message || "");
-
-      if (!retryable || attempt === EXCEL_READ_ATTEMPTS - 1) {
-        break;
-      }
-
-      await sleep(EXCEL_READ_DELAY_MS * (attempt + 1));
-    }
-  }
-
-  throw new Error(toClientMessage(lastError, "sync"));
-}
-
 async function syncExcelToSheets(config, log = () => {}) {
-  const { excelPath, spreadsheetId, sheetName } = config;
+  const {
+    excelPath,
+    spreadsheetId,
+    sheetName,
+    profileId,
+    profileName,
+    columnMapping,
+  } = config;
+  const label = profileName ? String(profileName) : "dati";
 
   if (!excelPath || !spreadsheetId || !sheetName) {
     throw new Error(
@@ -53,35 +29,31 @@ async function syncExcelToSheets(config, log = () => {}) {
     );
   }
 
-  reportProgress(log, 10, "Sto leggendo il file clienti");
-  log("Sto leggendo il file clienti...");
-
-  const workbook = await readExcelWorkbook(excelPath);
-  const sheetNames = workbook.SheetNames || [];
-
-  if (!sheetNames.length) {
-    reportProgress(log, 100, "Completato");
-    log("Nessun foglio trovato nel file Excel.");
-    return { ok: true, rows: 0 };
+  const fileCheck = await validateExcelFile(excelPath);
+  if (!fileCheck.ok) {
+    throw new Error(fileCheck.message);
   }
 
-  const excelSheet = workbook.Sheets[sheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(excelSheet, { defval: "" });
+  reportProgress(log, 10, `Sto leggendo ${label}`);
+  log(`Sto leggendo il file Excel (${label})...`);
 
-  if (!rows.length) {
+  const workbook = await readWorkbookWithRetry(excelPath);
+  const { headers, rows } = sheetToRows(workbook);
+
+  if (!headers.length || !rows.length) {
     reportProgress(log, 100, "Completato");
-    log("Nessun cliente trovato nel file Excel.");
+    log("Nessun dato trovato nel file Excel.");
     return { ok: true, rows: 0 };
   }
 
   reportProgress(log, 35, "Sto preparando i dati");
 
-  const headers = Object.keys(rows[0]);
-  const columnCount = headers.length;
-  const values = [
-    headers,
-    ...rows.map((row) => headers.map((header) => row[header] ?? "")),
-  ];
+  const mapped = hasActiveMapping(columnMapping)
+    ? applyColumnMapping(headers, rows, columnMapping)
+    : applyColumnMapping(headers, rows, []);
+
+  const values = mapped.values;
+  const columnCount = values[0]?.length || headers.length;
 
   reportProgress(log, 60, "Mi collego a Google Sheets");
 
@@ -94,7 +66,7 @@ async function syncExcelToSheets(config, log = () => {}) {
 
   const sheets = google.sheets({ version: "v4", auth });
   const clearRange = buildClearRange(sheetName, columnCount);
-  const updateRange = buildUpdateRange(sheetName);
+  const updateRange = buildUpdateRange(sheetName, columnCount);
 
   reportProgress(log, 80, "Sto aggiornando il foglio Google");
 
@@ -116,13 +88,26 @@ async function syncExcelToSheets(config, log = () => {}) {
     throw new Error(toClientMessage(error, "google"));
   }
 
+  const rowCount = Math.max(0, values.length - 1);
   reportProgress(log, 100, "Completato");
-  log(`Sincronizzazione completata: ${rows.length} righe.`);
+  log(`Sincronizzazione completata: ${rowCount} righe.`);
+
+  // Normalizziamo le righe ORIGINALI (pre-mapping) per il diff:
+  // l'utente vuole vedere i dati così come sono in Excel.
+  let normalizedRows = [];
+  try {
+    normalizedRows = normalizeRows(headers, rows);
+  } catch (_) {
+    normalizedRows = [];
+  }
 
   return {
     ok: true,
-    rows: rows.length,
+    rows: rowCount,
     date: new Date().toISOString(),
+    profileId: profileId || null,
+    headers,
+    normalizedRows,
   };
 }
 

@@ -1,8 +1,8 @@
 # Asset release GitHub — nomi stabili
 
-Ogni release GitHub usa **nomi file fissi** (senza versione nel filename), così il sito Aven Labs e i link `releases/latest/download/...` restano validi tra una versione e l’altra.
+Ogni release GitHub usa **nomi file fissi** (senza versione nel filename), così il sito Aven Labs e i link `releases/latest/download/...` restano validi tra una versione e l'altra.
 
-La **versione** resta in `package.json`, nel tag Git (`v1.0.1`) e dentro `latest.yml` / `latest-mac.yml`.
+La **versione** resta in `package.json`, nel tag Git (`v26.0.0`) e dentro `latest.yml` / `latest-mac.yml`.
 
 ---
 
@@ -60,10 +60,10 @@ La **versione** resta in `package.json`, nel tag Git (`v1.0.1`) e dentro `latest
 
 ## Checklist upload release
 
-1. Incrementa `version` in `package.json`.
-2. Build su macchina corretta (`dist:win` / `dist:mac`).
+1. Incrementa `version` in `package.json` seguendo [`VERSIONING.md`](../../VERSIONING.md) (calendar-based, MAJOR = anno).
+2. Build su macchina corretta (`dist:win` / `dist:mac`) — oppure lascia fare a GitHub Actions con il push del tag.
 3. Crea tag `vX.Y.Z` e GitHub Release.
-4. Carica **tutti** i file sopra per le piattaforme supportate.
+4. Carica **tutti** i file sopra per le piattaforme supportate (Actions lo fa automaticamente).
 5. Verifica che `latest.yml` / `latest-mac.yml` puntino ai nomi stabili (generati da electron-builder).
 
 Non committare `dist/` nel repository.

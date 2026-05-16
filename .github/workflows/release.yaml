@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,6 +12,7 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
 
@@ -23,7 +25,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -31,29 +33,47 @@ jobs:
 
       - name: Create OAuth credentials file
         shell: bash
+        env:
+          OAUTH_CREDENTIALS_JSON: ${{ secrets.OAUTH_CREDENTIALS_JSON }}
         run: |
-          echo '${{ secrets.OAUTH_CREDENTIALS_JSON }}' > oauth_credentials.json
+          if [ -z "$OAUTH_CREDENTIALS_JSON" ]; then
+            echo "OAUTH_CREDENTIALS_JSON secret is empty"
+            exit 1
+          fi
+          printf '%s' "$OAUTH_CREDENTIALS_JSON" > oauth_credentials.json
 
-      - name: Build Windows
+      - name: Build Windows installer
         if: matrix.os == 'windows-latest'
         run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build macOS
+      - name: Build macOS ARM64 DMG
         if: matrix.os == 'macos-latest'
         run: npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: List build artifacts
+        shell: bash
+        run: ls -la dist || true
+
+      - name: Cleanup OAuth credentials
+        if: always()
+        shell: bash
+        run: rm -f oauth_credentials.json
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             dist/*.exe
             dist/*.dmg
             dist/*.yml
             dist/*.blockmap
+          generate_release_notes: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

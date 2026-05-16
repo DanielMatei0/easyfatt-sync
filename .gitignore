@@ -16,13 +16,22 @@ out/
 *.dmg
 *.exe
 *.blockmap
+*.AppImage
+*.snap
+*.deb
+*.zip
 latest.yml
 latest-mac.yml
+latest-linux.yml
 
-# Local app data / backups
+# Local app data / backups (Easyfatt Sync)
 *.easyfatt-sync-backup.json
 backups/
 *.backup.json
+
+# Sync diff data (local only, contains client data)
+profileDataSnapshots.json
+syncHistoryDiffs.json
 
 # Logs
 *.log
@@ -35,6 +44,7 @@ assets/icon.iconset/
 .DS_Store
 Thumbs.db
 .vscode/settings.json
+.idea/
 
 # Backend example (keep .env.example only)
 backend-examples/**/.env.local

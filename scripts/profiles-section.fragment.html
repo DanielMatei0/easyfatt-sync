@@ -1,0 +1,18 @@
+        <section class="card sync-profiles-section" aria-labelledby="profiles-section-title">
+          <div class="profiles-header">
+            <div>
+              <h2 id="profiles-section-title" class="sync-hero-title">Connessioni sync</h2>
+              <p class="sync-hero-desc">Ogni connessione collega un file Excel a un foglio Google.</p>
+            </div>
+            <div class="profiles-toolbar">
+              <button type="button" id="syncAllBtn" class="btn btn-primary">Sincronizza tutto</button>
+              <button type="button" id="addProfileBtn" class="btn btn-secondary">Aggiungi file</button>
+            </div>
+          </div>
+          <p id="profilesEmpty" class="profiles-empty" hidden>Nessuna connessione. Clicca <strong>Aggiungi file</strong> per iniziare.</p>
+          <div id="profilesList" class="profiles-list" role="list"></div>
+        </section>
+
+        <!-- Impostazioni ad accordion -->
+        <div class="accordion" id="settingsAccordion">
+          <div class="accordion-item" data-accordion-item id="accordion-google">

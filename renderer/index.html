@@ -73,6 +73,23 @@
           <p id="supportMessageError" class="field-error" hidden></p>
         </div>
 
+        <label class="check-item">
+          <input type="checkbox" id="supportAttachDiagnostic" />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text">
+            <span class="check-title">Allega report diagnostico</span>
+            <span class="check-desc">Include cronologia recente e stato app (senza token né dati Excel)</span>
+          </span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="supportDiagnosticConsent" />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text">
+            <span class="check-title">Autorizzo l’invio delle informazioni tecniche per ricevere supporto</span>
+          </span>
+        </label>
+        <p id="supportDiagnosticConsentError" class="field-error" hidden></p>
+
         <p id="supportFeedback" class="support-feedback" hidden role="status"></p>
 
         <div class="support-actions">
@@ -88,6 +105,72 @@
     </div>
   </div>
 
+  <div id="profileModal" class="support-modal" hidden role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="support-modal-card profile-modal-card">
+      <h2 id="profile-modal-title" class="support-modal-title">Connessione sync</h2>
+      <p class="support-modal-desc">Collega un file Excel a un foglio Google Sheets.</p>
+      <form id="profileForm" class="support-form profile-form" novalidate>
+        <input type="hidden" id="profileId" value="" />
+        <div class="support-field">
+          <label class="field-label" for="profileName">Nome connessione</label>
+          <input id="profileName" type="text" placeholder="Es. Clienti Easyfatt" required />
+          <p id="profileNameError" class="field-error" hidden></p>
+        </div>
+        <div class="support-field">
+          <label class="field-label" for="profileExcelPath">File Excel</label>
+          <div class="row">
+            <input id="profileExcelPath" type="text" placeholder="C:\AvenSync\clienti.xlsx" autocomplete="off" />
+            <button type="button" id="profileBrowseBtn" class="btn btn-secondary">Sfoglia</button>
+          </div>
+          <p id="profileExcelError" class="field-error" hidden></p>
+        </div>
+        <div class="support-field">
+          <label class="field-label" for="profileSpreadsheetId">ID Google Sheet</label>
+          <input id="profileSpreadsheetId" type="text" placeholder="1AbCDef..." autocomplete="off" />
+          <p id="profileSpreadsheetError" class="field-error" hidden></p>
+        </div>
+        <div class="support-field">
+          <label class="field-label" for="profileSheetName">Nome scheda</label>
+          <input id="profileSheetName" type="text" placeholder="Clienti" autocomplete="off" />
+          <p id="profileSheetError" class="field-error" hidden></p>
+        </div>
+        <label class="check-item">
+          <input type="checkbox" id="profileEnabled" checked />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text"><span class="check-title">Profilo attivo</span><span class="check-desc">Disattiva per sospendere sync e automazioni</span></span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="profileWatchEnabled" />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text"><span class="check-title">Sync quando il file cambia</span><span class="check-desc">Aggiorna al salvataggio del file Excel</span></span>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="profileScheduleEnabled" />
+          <span class="check-box" aria-hidden="true"></span>
+          <span class="check-text"><span class="check-title">Sync programmata</span><span class="check-desc">Esegue la sync negli orari impostati</span></span>
+        </label>
+        <div id="profileScheduleFields" class="nested-fields">
+          <label class="field-label" for="profileSyncTimes">Orari sincronizzazione</label>
+          <textarea id="profileSyncTimes" placeholder="09:00&#10;13:00&#10;18:00"></textarea>
+          <p class="field-hint">Un orario per riga, formato HH:MM.</p>
+        </div>
+
+        <details class="mapping-details" id="profileMappingDetails">
+          <summary class="mapping-summary">Mapping colonne (opzionale)</summary>
+          <p class="field-hint">Se non configuri il mapping, le colonne Excel vengono copiate con gli stessi nomi.</p>
+          <button type="button" id="profileLoadMappingBtn" class="btn btn-secondary btn-sm">Carica intestazioni dal file</button>
+          <div id="profileExcelPreview" class="excel-preview-wrap" hidden></div>
+          <div id="profileMappingTable" class="mapping-table-wrap"></div>
+        </details>
+
+        <p id="profileFormError" class="field-error" hidden></p>
+        <div class="support-actions">
+          <button type="button" id="profileCancelBtn" class="btn btn-secondary">Annulla</button>
+          <button type="submit" id="profileSaveBtn" class="btn btn-primary">Salva connessione</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div id="backupRestoreModal" class="support-modal" hidden role="dialog" aria-modal="true" aria-labelledby="backup-restore-modal-title">
     <div class="support-modal-card">
       <h2 id="backup-restore-modal-title" class="support-modal-title">Ripristina backup</h2>
@@ -100,6 +183,261 @@
     </div>
   </div>
 
+  <div id="onboardingOverlay" class="onboarding-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+    <div class="onboarding-card" tabindex="-1">
+      <header class="onboarding-head">
+        <div class="onboarding-head-row">
+          <div class="onboarding-brand">
+            <span class="onboarding-brand-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+            <span class="onboarding-brand-text">Configurazione guidata</span>
+          </div>
+          <button type="button" id="onboardingCloseBtn" class="onboarding-close" aria-label="Chiudi configurazione">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <div class="onboarding-progress" aria-hidden="true">
+          <div class="onboarding-progress-meta">
+            <span id="onboardingStepLabel" class="onboarding-step-label">Step 1 di 6</span>
+            <span id="onboardingProgressPercent" class="onboarding-progress-percent">17%</span>
+          </div>
+          <div class="onboarding-progress-bar">
+            <span id="onboardingProgressFill" class="onboarding-progress-fill" style="width: 17%"></span>
+          </div>
+        </div>
+
+        <h2 id="onboardingTitle" class="onboarding-title">Benvenuto in Easyfatt Sync</h2>
+        <p id="onboardingSubtitle" class="onboarding-subtitle">Ti accompagniamo in pochi minuti.</p>
+      </header>
+
+      <div class="onboarding-body">
+
+        <!-- STEP 1: Welcome -->
+        <section data-onboarding-step="welcome" class="onboarding-step is-active">
+          <div class="onboarding-welcome">
+            <div class="onboarding-hero-icon" aria-hidden="true">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2l2.5 6.5L21 10l-5 4.5L17.5 21 12 17.5 6.5 21 8 14.5 3 10l6.5-1.5L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h3 class="onboarding-step-title">Connetti Excel e Google Sheets in 6 semplici passi</h3>
+            <p class="onboarding-step-desc">
+              Ti guideremo nella configurazione della tua prima sincronizzazione. Non serve essere esperti: ogni passo è spiegato.
+            </p>
+            <ul class="onboarding-checklist" aria-label="Cosa farai">
+              <li><span class="onboarding-check-num">1</span><span>Colleghi il tuo account Google</span></li>
+              <li><span class="onboarding-check-num">2</span><span>Selezioni il file Excel di Easyfatt</span></li>
+              <li><span class="onboarding-check-num">3</span><span>Indichi il foglio Google di destinazione</span></li>
+              <li><span class="onboarding-check-num">4</span><span>Verifichiamo insieme che tutto funzioni</span></li>
+            </ul>
+            <p class="onboarding-hint">Puoi chiudere e riprendere quando vuoi: nulla viene perso.</p>
+          </div>
+        </section>
+
+        <!-- STEP 2: Google -->
+        <section data-onboarding-step="google" class="onboarding-step" hidden>
+          <h3 class="onboarding-step-title">Collega il tuo account Google</h3>
+          <p class="onboarding-step-desc">
+            Easyfatt Sync ha bisogno del tuo permesso per scrivere sul foglio Google che sceglierai.
+            Apriremo il browser per il login: non vediamo mai la tua password.
+          </p>
+
+          <div id="obGoogleConnectedBox" class="onboarding-status-card" data-state="connected" hidden>
+            <div class="onboarding-status-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="onboarding-status-body">
+              <strong class="onboarding-status-title">Google già collegato</strong>
+              <p class="onboarding-status-desc">Il tuo account è pronto. Puoi continuare al passo successivo.</p>
+              <button type="button" id="obChangeAccountBtn" class="btn-text">Cambia account Google</button>
+            </div>
+          </div>
+
+          <div id="obGoogleConnectBox" class="onboarding-status-card" data-state="inactive">
+            <div class="onboarding-status-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class="onboarding-status-body">
+              <strong class="onboarding-status-title" id="obGoogleStatus">Account Google non collegato</strong>
+              <p class="onboarding-status-desc">Clicca il pulsante qui sotto. Si aprirà il browser per l’accesso sicuro Google.</p>
+              <button type="button" id="obConnectGoogleBtn" class="btn btn-primary btn-google-onboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 12.27c0-.65-.06-1.27-.17-1.87H12v3.54h5.05c-.22 1.17-.88 2.16-1.87 2.82v2.34h3.02c1.77-1.63 2.8-4.03 2.8-6.83z" fill="#4285F4"/><path d="M12 21c2.52 0 4.63-.83 6.18-2.27l-3.02-2.34c-.84.56-1.91.9-3.16.9-2.43 0-4.49-1.64-5.22-3.84H3.66v2.41C5.2 18.79 8.36 21 12 21z" fill="#34A853"/><path d="M6.78 13.45A5.4 5.4 0 016.5 12c0-.5.09-.99.28-1.45V8.14H3.66A8.92 8.92 0 003 12c0 1.42.34 2.76.66 3.86l3.12-2.41z" fill="#FBBC05"/><path d="M12 6.4c1.37 0 2.6.47 3.57 1.4l2.68-2.68C16.62 3.7 14.5 3 12 3 8.36 3 5.2 5.21 3.66 8.14l3.12 2.41C7.51 8.04 9.57 6.4 12 6.4z" fill="#EA4335"/></svg>
+                Collega Google
+              </button>
+            </div>
+          </div>
+
+          <p class="onboarding-tip">
+            <span class="onboarding-tip-icon" aria-hidden="true">i</span>
+            Usa un account Google che abbia accesso al foglio di destinazione.
+          </p>
+        </section>
+
+        <!-- STEP 3: Excel file -->
+        <section data-onboarding-step="excel" class="onboarding-step" hidden>
+          <h3 class="onboarding-step-title">Seleziona il file Excel di Easyfatt</h3>
+          <p class="onboarding-step-desc">
+            Scegli il file <strong>.xlsx</strong> che Easyfatt esporta con i tuoi dati (di solito l’elenco clienti).
+          </p>
+
+          <div class="onboarding-file-picker">
+            <button type="button" id="obBrowseBtn" class="onboarding-file-dropzone">
+              <span class="onboarding-file-icon" aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v6h6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="onboarding-file-label">
+                <strong>Scegli file Excel</strong>
+                <span class="onboarding-file-sub">.xlsx, .xls — il file resta sul tuo computer</span>
+              </span>
+            </button>
+            <input id="obExcelPath" type="hidden" />
+
+            <div id="obFileCard" class="onboarding-file-card" hidden>
+              <div class="onboarding-file-card-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v6h6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="onboarding-file-card-body">
+                <strong id="obFileName" class="onboarding-file-card-name">file.xlsx</strong>
+                <span id="obFileMeta" class="onboarding-file-card-meta">—</span>
+              </div>
+              <span id="obFileBadge" class="onboarding-file-badge" data-tone="success">File valido</span>
+              <button type="button" id="obFileChangeBtn" class="btn-text">Cambia</button>
+            </div>
+
+            <p id="obFileError" class="onboarding-inline-error" hidden></p>
+          </div>
+
+          <div class="onboarding-field">
+            <label class="field-label" for="obProfileName">Nome della configurazione</label>
+            <input id="obProfileName" type="text" placeholder="Es. Clienti Easyfatt" autocomplete="off" />
+            <p class="field-hint">Un nome a tua scelta per riconoscere questa connessione.</p>
+          </div>
+
+          <p class="onboarding-tip">
+            <span class="onboarding-tip-icon" aria-hidden="true">i</span>
+            Dopo ogni export da Easyfatt sovrascrivi lo stesso file: non servirà più selezionarlo.
+          </p>
+        </section>
+
+        <!-- STEP 4: Google Sheet -->
+        <section data-onboarding-step="sheet" class="onboarding-step" hidden>
+          <h3 class="onboarding-step-title">Indica il foglio Google di destinazione</h3>
+          <p class="onboarding-step-desc">
+            Apri il tuo foglio Google nel browser e copia il <strong>codice</strong> evidenziato nell’indirizzo.
+          </p>
+
+          <div class="onboarding-url-example" aria-hidden="true">
+            <span class="onboarding-url-label">Esempio di URL Google Sheets</span>
+            <div class="onboarding-url-box">
+              <span class="onboarding-url-fade">https://docs.google.com/spreadsheets/d/</span>
+              <span class="onboarding-url-highlight">1AbCDefGhIjKlMnOpQrStuVwXyZ123456789</span>
+              <span class="onboarding-url-fade">/edit#gid=0</span>
+            </div>
+            <p class="onboarding-url-caption">È la parte in giallo: copiala e incollala qui sotto.</p>
+          </div>
+
+          <details class="onboarding-help-details" id="obSheetHelpDetails">
+            <summary>Come trovo questo codice?</summary>
+            <ol class="onboarding-help-steps">
+              <li>Apri il tuo foglio Google nel browser (Chrome, Edge, Safari…).</li>
+              <li>Guarda la barra dell’indirizzo in alto.</li>
+              <li>Copia <em>solo</em> la parte tra <code>/d/</code> e <code>/edit</code>.</li>
+            </ol>
+          </details>
+
+          <div class="onboarding-field">
+            <label class="field-label" for="obSpreadsheetId">Codice del foglio Google</label>
+            <input id="obSpreadsheetId" type="text" placeholder="Incolla qui il codice del foglio" autocomplete="off" spellcheck="false" />
+            <p id="obSheetIdHint" class="field-hint">Puoi anche incollare l’intero URL: estraiamo noi il codice.</p>
+          </div>
+
+          <div class="onboarding-field">
+            <label class="field-label" for="obSheetName">Nome della scheda (tab in basso)</label>
+            <input id="obSheetName" type="text" value="Clienti" autocomplete="off" />
+            <p class="field-hint">È il nome della tab in basso al foglio Google. Default: Clienti.</p>
+          </div>
+
+          <p id="obSheetError" class="onboarding-inline-error" hidden></p>
+        </section>
+
+        <!-- STEP 5: Verify -->
+        <section data-onboarding-step="verify" class="onboarding-step" hidden>
+          <h3 class="onboarding-step-title">Verifichiamo che tutto sia pronto</h3>
+          <p class="onboarding-step-desc">Controlliamo file, account Google e foglio di destinazione.</p>
+
+          <ul class="onboarding-verify-list">
+            <li id="obVerifyGoogle" class="onboarding-verify-item" data-state="pending">
+              <span class="onboarding-verify-icon" aria-hidden="true"></span>
+              <span class="onboarding-verify-body">
+                <strong>Account Google</strong>
+                <span class="onboarding-verify-msg">In attesa…</span>
+              </span>
+            </li>
+            <li id="obVerifyFile" class="onboarding-verify-item" data-state="pending">
+              <span class="onboarding-verify-icon" aria-hidden="true"></span>
+              <span class="onboarding-verify-body">
+                <strong>File Excel</strong>
+                <span class="onboarding-verify-msg">In attesa…</span>
+              </span>
+            </li>
+            <li id="obVerifySheet" class="onboarding-verify-item" data-state="pending">
+              <span class="onboarding-verify-icon" aria-hidden="true"></span>
+              <span class="onboarding-verify-body">
+                <strong>Foglio Google</strong>
+                <span class="onboarding-verify-msg">In attesa…</span>
+              </span>
+            </li>
+          </ul>
+
+          <button type="button" id="obRetryVerifyBtn" class="btn btn-secondary btn-sm">Ricontrolla</button>
+        </section>
+
+        <!-- STEP 6: Summary -->
+        <section data-onboarding-step="summary" class="onboarding-step" hidden>
+          <h3 class="onboarding-step-title">Tutto pronto!</h3>
+          <p class="onboarding-step-desc">Ecco il riepilogo della tua prima configurazione. Quando sei pronto, avvia la sincronizzazione.</p>
+
+          <dl class="onboarding-summary">
+            <div class="onboarding-summary-row">
+              <dt>Nome configurazione</dt>
+              <dd id="obSummaryName">—</dd>
+            </div>
+            <div class="onboarding-summary-row">
+              <dt>File Excel</dt>
+              <dd id="obSummaryFile">—</dd>
+            </div>
+            <div class="onboarding-summary-row">
+              <dt>Foglio Google</dt>
+              <dd id="obSummarySheet">—</dd>
+            </div>
+            <div class="onboarding-summary-row">
+              <dt>Account Google</dt>
+              <dd id="obSummaryGoogle">—</dd>
+            </div>
+            <div class="onboarding-summary-row">
+              <dt>Modalità sync</dt>
+              <dd>Manuale (puoi attivare automazioni in seguito)</dd>
+            </div>
+          </dl>
+
+          <p id="obFinishError" class="onboarding-inline-error" hidden></p>
+        </section>
+
+      </div>
+
+      <footer class="onboarding-actions">
+        <button type="button" id="onboardingSkipBtn" class="btn-text onboarding-skip">Salta configurazione</button>
+        <div class="onboarding-nav">
+          <button type="button" id="onboardingBackBtn" class="btn btn-secondary" hidden>Indietro</button>
+          <button type="button" id="onboardingNextBtn" class="btn btn-primary">Avanti</button>
+          <button type="button" id="onboardingFinishBtn" class="btn btn-primary" hidden>Esegui prima sincronizzazione</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
   <div class="app-shell" id="appShell">
     <header class="app-header">
       <div class="brand">
@@ -108,7 +446,7 @@
         </div>
         <div class="brand-text">
           <h1>Easyfatt Sync</h1>
-          <p class="subtitle">Aggiorna Google Sheets con i clienti esportati da Easyfatt.</p>
+          <p class="subtitle">Sincronizza Excel con Google Sheets.</p>
         </div>
       </div>
       <button type="button" id="themeToggle" class="theme-toggle" aria-label="Cambia tema">
@@ -123,26 +461,120 @@
     </header>
 
     <main class="app">
+      <nav class="app-sidebar" aria-label="Navigazione principale">
+        <ul class="app-nav" role="list">
+          <li><button type="button" class="app-nav-item is-active" data-view-target="dashboard" title="Dashboard" aria-label="Dashboard">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 12l9-8 9 8v8a2 2 0 01-2 2h-4v-6h-6v6H5a2 2 0 01-2-2v-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Dashboard</span>
+          </button></li>
+          <li><button type="button" class="app-nav-item" data-view-target="sync" title="Sincronizzazioni" aria-label="Sincronizzazioni">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0114-5l2-2v6h-6l2-2a6 6 0 00-10 3M20 12a8 8 0 01-14 5l-2 2v-6h6l-2 2a6 6 0 0010-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Sincronizzazioni</span>
+            <span id="navSyncBadge" class="app-nav-badge" hidden>0</span>
+          </button></li>
+          <li><button type="button" class="app-nav-item" data-view-target="history" title="Cronologia" aria-label="Cronologia">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8v5l3 2M3 12a9 9 0 109-9c-2.6 0-5 1-6.7 2.6L3 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3v5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Cronologia</span>
+          </button></li>
+          <li><button type="button" class="app-nav-item" data-view-target="backup" title="Backup" aria-label="Backup">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Backup</span>
+          </button></li>
+          <li><button type="button" class="app-nav-item" data-view-target="settings" title="Impostazioni" aria-label="Impostazioni">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Impostazioni</span>
+          </button></li>
+          <li><button type="button" class="app-nav-item" data-view-target="notifications" title="Notifiche" aria-label="Notifiche">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Notifiche</span>
+          </button></li>
+          <li><button type="button" class="app-nav-item" data-view-target="support" title="Supporto" aria-label="Supporto">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 21a9 9 0 100-18 9 9 0 000 18z" stroke="currentColor" stroke-width="1.6"/><path d="M9.1 9a3 3 0 015.7 1c0 2-3 3-3 3M12 17h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Supporto</span>
+          </button></li>
+          <li><button type="button" class="app-nav-item" data-view-target="about" title="Informazioni" aria-label="Informazioni">
+            <span class="app-nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 8h.01M11 12h1v5h1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="app-nav-label">Informazioni</span>
+          </button></li>
+        </ul>
+
+        <div class="app-sidebar-foot">
+          <div class="app-sidebar-version">v<span id="sidebarAppVersion">—</span></div>
+          <div class="app-sidebar-brand">Aven Labs</div>
+        </div>
+      </nav>
+
       <div class="column-main">
         <p id="unsavedBanner" class="unsaved-banner" hidden role="status">Hai modifiche non salvate — clicca Salva impostazioni</p>
 
-        <!-- Card sincronizzazione principale (sempre visibile) -->
-        <section class="card sync-hero" aria-labelledby="sync-hero-title">
-          <h2 id="sync-hero-title" class="sync-hero-title">Sincronizza clienti</h2>
-          <p class="sync-hero-desc">Trasferisci l’elenco clienti da Easyfatt al tuo foglio Google con un clic.</p>
+        <!-- VIEW: DASHBOARD -->
+        <section data-view="dashboard" class="app-view is-active">
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Dashboard</h1>
+              <p class="view-subtitle">Panoramica e stato delle tue sincronizzazioni.</p>
+            </div>
+            <div class="view-header-actions">
+              <button type="button" id="dashSyncAllBtn" class="btn btn-secondary">Sincronizza tutto</button>
+              <button type="button" id="dashAddProfileBtn" class="btn btn-primary">Aggiungi sincronizzazione</button>
+            </div>
+          </header>
 
-          <button type="button" id="syncBtn" class="btn btn-primary btn-sync-hero">
-            <svg class="btn-sync-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 0113.66-5.66M20 12a8 8 0 01-13.66 5.66" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4h4v4M8 20H4v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="syncBtnLabel">Sincronizza ora</span>
-          </button>
+        <section class="card health-dashboard" aria-labelledby="health-dashboard-title">
+          <div class="health-header">
+            <div>
+              <h2 id="health-dashboard-title" class="sync-hero-title">Stato sistema</h2>
+              <p class="sync-hero-desc">Sta funzionando tutto?</p>
+            </div>
+            <span id="healthLevel" class="health-level-pill" data-level="operational">Operativo</span>
+          </div>
+          <p id="healthSummary" class="health-summary">—</p>
+          <ul class="health-stats-grid" aria-label="Indicatori salute">
+            <li><span class="stat-label">Ultima sync</span><span id="healthLastSync" class="stat-value">—</span></li>
+            <li><span class="stat-label">Prossima programmata</span><span id="healthNextSync" class="stat-value">—</span></li>
+            <li><span class="stat-label">Connessioni</span><span id="healthProfiles" class="stat-value">0</span></li>
+            <li><span class="stat-label">File monitorati</span><span id="healthWatch" class="stat-value">0</span></li>
+            <li><span class="stat-label">Righe oggi</span><span id="healthRowsToday" class="stat-value">0</span></li>
+            <li><span class="stat-label">Google</span><span id="healthGoogleBadge" class="stat-value stat-pill" data-tone="inactive">Non collegato</span></li>
+          </ul>
+          <ul id="healthErrorsList" class="health-errors-list" hidden aria-label="Errori recenti"></ul>
+        </section>
+        </section>
+        <!-- /VIEW DASHBOARD -->
 
-          <ul class="sync-quick-stats" aria-label="Riepilogo rapido">
+        <!-- VIEW: SINCRONIZZAZIONI -->
+        <section data-view="sync" class="app-view" hidden>
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Sincronizzazioni</h1>
+              <p class="view-subtitle">Gestisci tutte le connessioni Excel → Google Sheets.</p>
+            </div>
+            <div class="view-header-actions">
+              <button type="button" id="viewSyncAllBtn" class="btn btn-secondary">Sincronizza tutto</button>
+              <button type="button" id="viewOpenWizardBtn" class="btn btn-secondary">Apri configurazione guidata</button>
+              <button type="button" id="viewAddProfileBtn" class="btn btn-primary">Aggiungi sincronizzazione</button>
+            </div>
+          </header>
+
+        <section class="card sync-profiles-section" aria-labelledby="profiles-section-title">
+          <div class="profiles-header">
+            <div>
+              <h2 id="profiles-section-title" class="sync-hero-title">Connessioni sync</h2>
+              <p class="sync-hero-desc">Ogni connessione collega un file Excel a un foglio Google.</p>
+            </div>
+            <div class="profiles-toolbar">
+              <button type="button" id="syncAllBtn" class="btn btn-primary">Sincronizza tutto</button>
+              <button type="button" id="openWizardBtn" class="btn btn-secondary">Apri configurazione guidata</button>
+              <button type="button" id="addProfileBtn" class="btn btn-secondary">Aggiungi sincronizzazione</button>
+            </div>
+          </div>
+          <ul class="sync-quick-stats profiles-quick-stats" aria-label="Riepilogo rapido">
             <li>
               <span class="stat-label">Ultima sync</span>
               <span id="heroLastSync" class="stat-value">Mai eseguita</span>
             </li>
             <li>
-              <span class="stat-label">Righe sincronizzate</span>
+              <span class="stat-label">Righe (conn. attiva)</span>
               <span id="heroLastSyncRows" class="stat-value">—</span>
             </li>
             <li>
@@ -150,60 +582,161 @@
               <span id="heroGoogle" class="stat-value stat-pill" data-tone="inactive">Non collegato</span>
             </li>
             <li>
-              <span class="stat-label">File monitorato</span>
+              <span class="stat-label">Watcher attivi</span>
               <span id="heroWatch" class="stat-value stat-pill" data-tone="inactive">Non attivo</span>
             </li>
           </ul>
+
+          <div id="profilesEmptyState" class="profiles-empty-state" hidden>
+            <div class="profiles-empty-icon" aria-hidden="true">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                <path d="M3 7h7l2 2h9v10a2 2 0 01-2 2H3V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M12 12v6m-3-3h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3 id="profilesEmptyTitle" class="profiles-empty-title">Configura la tua prima sincronizzazione</h3>
+            <p id="profilesEmptyDesc" class="profiles-empty-desc">
+              In pochi passi colleghi il file Excel di Easyfatt al tuo foglio Google.
+              Tutto resta sul tuo computer, senza configurazioni tecniche complicate.
+            </p>
+            <div class="profiles-empty-actions">
+              <button type="button" id="emptyStartWizardBtn" class="btn btn-primary btn-lg">Inizia configurazione guidata</button>
+              <button type="button" id="emptyAddProfileBtn" class="btn-text">Preferisco configurare manualmente</button>
+            </div>
+            <p class="profiles-empty-help">
+              Servono solo 2–3 minuti.
+              <button type="button" class="link-btn" data-external-url="https://aven-labs.com/products/easyfatt-sync/setup-guide">Apri la guida</button>
+            </p>
+          </div>
+
+          <div id="profilesList" class="profiles-list" role="list"></div>
         </section>
+        </section>
+        <!-- /VIEW SINCRONIZZAZIONI -->
 
-        <!-- Impostazioni ad accordion -->
-        <div class="accordion" id="settingsAccordion">
-          <div class="accordion-item" data-accordion-item>
-            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-origin" id="trigger-origin">
-              <span class="accordion-icon" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" stroke-width="1.75"/><path d="M14 2v6h6M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-              </span>
-              <span class="accordion-text">
-                <span class="accordion-title">Origine dati</span>
-                <span class="accordion-desc">File Excel esportato da Easyfatt</span>
-              </span>
-              <span class="accordion-chevron" aria-hidden="true"></span>
-            </button>
-            <div id="panel-origin" class="accordion-panel" role="region" aria-labelledby="trigger-origin">
-              <div class="accordion-body">
-                <label class="field-label" for="excelPath">File Excel Easyfatt</label>
-                <div class="row">
-                  <input id="excelPath" type="text" placeholder="C:\AvenSync\clienti.xlsx" autocomplete="off" />
-                  <button type="button" id="browseBtn" class="btn btn-secondary">Sfoglia</button>
+        <!-- VIEW: CRONOLOGIA -->
+        <section data-view="history" class="app-view" hidden>
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Cronologia</h1>
+              <p class="view-subtitle">Tutti gli eventi di sincronizzazione registrati.</p>
+            </div>
+            <div class="view-header-actions">
+              <button type="button" id="viewHistoryClearBtn" class="btn btn-secondary">Pulisci cronologia</button>
+              <button type="button" id="viewHistoryExportBtn" class="btn btn-secondary">Esporta report</button>
+            </div>
+          </header>
+
+        <section class="card sync-history-section" aria-labelledby="history-section-title">
+          <div class="history-header">
+            <div>
+              <h2 id="history-section-title" class="sync-hero-title">Cronologia sync</h2>
+              <p class="sync-hero-desc">Ultimi eventi di sincronizzazione</p>
+            </div>
+            <button type="button" id="historyExportBtn" class="btn btn-secondary btn-sm">Esporta report</button>
+          </div>
+          <div class="history-filters">
+            <label class="field-label" for="historyFilterProfile">Profilo</label>
+            <select id="historyFilterProfile"><option value="">Tutti i profili</option></select>
+            <label class="field-label" for="historyFilterStatus">Stato</label>
+            <select id="historyFilterStatus">
+              <option value="all">Tutti</option>
+              <option value="success">Successo</option>
+              <option value="error">Errore</option>
+            </select>
+          </div>
+          <p id="historyEmpty" class="history-empty">Nessun evento ancora registrato.</p>
+          <div id="historyList" class="history-list"></div>
+        </section>
+        </section>
+        <!-- /VIEW CRONOLOGIA -->
+
+        <!-- VIEW: BACKUP -->
+        <section data-view="backup" class="app-view" hidden>
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Backup &amp; Ripristino</h1>
+              <p class="view-subtitle">Proteggi le tue impostazioni e ripristina con un clic.</p>
+            </div>
+          </header>
+        </section>
+        <!-- /VIEW BACKUP -->
+
+        <!-- VIEW: IMPOSTAZIONI -->
+        <section data-view="settings" class="app-view" hidden>
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Impostazioni</h1>
+              <p class="view-subtitle">Account Google, automazioni e privacy.</p>
+            </div>
+          </header>
+        </section>
+        <!-- /VIEW IMPOSTAZIONI -->
+
+        <!-- VIEW: NOTIFICHE -->
+        <section data-view="notifications" class="app-view" hidden>
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Notifiche</h1>
+              <p class="view-subtitle">Avvisi desktop e promemoria intelligenti.</p>
+            </div>
+          </header>
+        </section>
+        <!-- /VIEW NOTIFICHE -->
+
+        <!-- VIEW: SUPPORTO -->
+        <section data-view="support" class="app-view" hidden>
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Supporto</h1>
+              <p class="view-subtitle">Hai bisogno di aiuto? Siamo qui per te.</p>
+            </div>
+          </header>
+
+          <div class="card support-view-card">
+            <div class="support-view-grid">
+              <article class="support-view-block">
+                <div class="support-view-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 5L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
-                <p class="field-hint">Percorso completo del file .xlsx generato da Easyfatt.</p>
-              </div>
+                <h3>Guida rapida</h3>
+                <p>Apri la guida online con tutti i passi illustrati.</p>
+                <button type="button" class="btn btn-secondary" data-external-url="https://aven-labs.com/products/easyfatt-sync/setup-guide">Apri la guida</button>
+              </article>
+              <article class="support-view-block">
+                <div class="support-view-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v14H6l-2 2V4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Contatta il supporto</h3>
+                <p>Inviaci un messaggio: ti rispondiamo nel più breve tempo possibile.</p>
+                <button type="button" id="supportViewOpenBtn" class="btn btn-primary">Apri form supporto</button>
+              </article>
+              <article class="support-view-block">
+                <div class="support-view-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4z" stroke="currentColor" stroke-width="1.6"/><path d="M8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                </div>
+                <h3>Genera report diagnostico</h3>
+                <p>Un file con stato app e cronologia: utile da allegare al supporto.</p>
+                <button type="button" id="supportViewDiagBtn" class="btn btn-secondary">Salva report</button>
+              </article>
             </div>
           </div>
+        </section>
+        <!-- /VIEW SUPPORTO -->
 
-          <div class="accordion-item" data-accordion-item>
-            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-destination" id="trigger-destination">
-              <span class="accordion-icon" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
-              </span>
-              <span class="accordion-text">
-                <span class="accordion-title">Destinazione Google</span>
-                <span class="accordion-desc">Foglio Google Sheets di destinazione</span>
-              </span>
-              <span class="accordion-chevron" aria-hidden="true"></span>
-            </button>
-            <div id="panel-destination" class="accordion-panel" role="region" aria-labelledby="trigger-destination">
-              <div class="accordion-body">
-                <label class="field-label" for="spreadsheetId">ID Google Sheet</label>
-                <input id="spreadsheetId" type="text" placeholder="1AbCDef..." autocomplete="off" />
-                <p class="field-hint">Nell’URL del foglio, tra <code>/d/</code> e <code>/edit</code>.</p>
-                <label class="field-label" for="sheetName">Nome scheda</label>
-                <input id="sheetName" type="text" placeholder="Clienti" autocomplete="off" />
-                <p class="field-hint">Nome esatto del tab nel documento.</p>
-              </div>
+        <!-- VIEW: INFORMAZIONI -->
+        <section data-view="about" class="app-view" hidden>
+          <header class="view-header">
+            <div class="view-header-text">
+              <h1 class="view-title">Informazioni</h1>
+              <p class="view-subtitle">Versione app, aggiornamenti e privacy.</p>
             </div>
-          </div>
+          </header>
+        </section>
+        <!-- /VIEW INFORMAZIONI -->
 
+        <!-- Accordion: contenitore originale, le sezioni vengono ridistribuite via JS -->
+        <div class="accordion" id="settingsAccordion">
           <div class="accordion-item" data-accordion-item id="accordion-google">
             <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-google" id="trigger-google">
               <span class="accordion-icon" aria-hidden="true">
@@ -295,43 +828,21 @@
               </span>
               <span class="accordion-text">
                 <span class="accordion-title">Automazioni</span>
-                <span class="accordion-desc">Sync automatica e avvio con Windows</span>
+                <span class="accordion-desc">Avvio con Windows</span>
               </span>
               <span class="accordion-chevron" aria-hidden="true"></span>
             </button>
             <div id="panel-automation" class="accordion-panel" role="region" aria-labelledby="trigger-automation">
               <div class="accordion-body">
-                <div class="checks">
-                  <label class="check-item">
-                    <input type="checkbox" id="watchEnabled" />
-                    <span class="check-box" aria-hidden="true"></span>
-                    <span class="check-text">
-                      <span class="check-title">Sync quando cambia il file</span>
-                      <span class="check-desc">Aggiorna al salvataggio del file Excel</span>
-                    </span>
-                  </label>
-                  <label class="check-item">
-                    <input type="checkbox" id="scheduleEnabled" />
-                    <span class="check-box" aria-hidden="true"></span>
-                    <span class="check-text">
-                      <span class="check-title">Sync programmata</span>
-                      <span class="check-desc">Esegue la sync negli orari impostati</span>
-                    </span>
-                  </label>
-                  <label class="check-item">
-                    <input type="checkbox" id="openAtLogin" />
-                    <span class="check-box" aria-hidden="true"></span>
-                    <span class="check-text">
-                      <span class="check-title">Avvio con Windows</span>
-                      <span class="check-desc">Apre l’app all’accensione del PC</span>
-                    </span>
-                  </label>
-                </div>
-                <div id="scheduleFields" class="nested-fields">
-                  <label class="field-label" for="syncTimes">Orari sincronizzazione</label>
-                  <textarea id="syncTimes" placeholder="09:00&#10;13:00&#10;18:00"></textarea>
-                  <p class="field-hint">Un orario per riga, formato HH:MM.</p>
-                </div>
+                <p class="field-hint">Le sync automatiche si configurano per ogni connessione (modifica profilo).</p>
+                <label class="check-item">
+                  <input type="checkbox" id="openAtLogin" />
+                  <span class="check-box" aria-hidden="true"></span>
+                  <span class="check-text">
+                    <span class="check-title">Avvio con Windows</span>
+                    <span class="check-desc">Apre l’app all’accensione del PC</span>
+                  </span>
+                </label>
               </div>
             </div>
           </div>
@@ -408,7 +919,9 @@
                 <div class="backup-actions">
                   <button type="button" id="backupCreateBtn" class="btn btn-secondary">Crea backup</button>
                   <button type="button" id="backupRestoreBtn" class="btn btn-secondary">Ripristina backup</button>
+                  <button type="button" id="backupTestBtn" class="btn btn-secondary">Test backup</button>
                 </div>
+                <p id="backupFolderWarning" class="backup-warning" hidden role="status"></p>
                 <p id="backupStatusText" class="backup-status-text" role="status">—</p>
 
                 <h3 class="backup-section-title">Backup automatici</h3>
@@ -460,7 +973,7 @@
           </div>
         </div>
 
-        <div class="save-bar">
+        <div class="save-bar" id="saveBar">
           <button type="button" id="saveBtn" class="btn btn-secondary btn-save">Salva impostazioni</button>
         </div>
       </div>
@@ -482,6 +995,7 @@
 
         <div class="badge-row" aria-label="Indicatori">
           <span id="badgeGoogle" class="badge" data-tone="inactive">Google</span>
+          <span id="badgeProfiles" class="badge" data-tone="inactive">0 conn.</span>
           <span id="badgeWatch" class="badge" data-tone="inactive">Watch</span>
           <span id="badgeSchedule" class="badge" data-tone="inactive">Programmata</span>
         </div>
@@ -493,12 +1007,32 @@
         <section class="activity-block" aria-labelledby="activity-heading">
           <div class="activity-header">
             <h3 id="activity-heading" class="activity-title">Attività recenti</h3>
-            <button type="button" id="clearActivityBtn" class="btn-text">Pulisci attività</button>
+            <button type="button" id="clearActivityBtn" class="btn-text">Pulisci</button>
           </div>
           <div id="activityList" class="activity-list" aria-live="polite">
             <p id="activityEmpty" class="activity-empty">
               Nessuna attività recente. Avvia una sincronizzazione per vedere gli aggiornamenti.
             </p>
+          </div>
+        </section>
+
+        <section class="help-card" aria-labelledby="help-card-title">
+          <div class="help-card-head">
+            <div class="help-card-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M9.1 9a3 3 0 015.7 1c0 2-3 3-3 3M12 17h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3 id="help-card-title">Hai bisogno di aiuto?</h3>
+          </div>
+          <p class="help-card-desc">Risposte rapide ai dubbi più comuni o contatto diretto col team.</p>
+          <div class="help-card-actions">
+            <button type="button" class="btn-text help-card-link" data-external-url="https://aven-labs.com/products/easyfatt-sync/setup-guide">
+              <span class="help-card-link-icon" aria-hidden="true">→</span>
+              Guida rapida
+            </button>
+            <button type="button" id="sideOpenSupportBtn" class="btn-text help-card-link">
+              <span class="help-card-link-icon" aria-hidden="true">→</span>
+              Contatta supporto
+            </button>
           </div>
         </section>
       </aside>
@@ -517,6 +1051,73 @@
     </footer>
   </div>
 
+  <!-- DIFF DETAIL MODAL -->
+  <div id="diffDetailOverlay" class="diff-overlay" role="dialog" aria-modal="true" aria-labelledby="diffDetailTitle" hidden>
+    <div class="diff-modal" role="document">
+      <header class="diff-modal-head">
+        <div class="diff-modal-head-text">
+          <h2 id="diffDetailTitle" class="diff-modal-title">Dettaglio sincronizzazione</h2>
+          <p id="diffDetailSubtitle" class="diff-modal-subtitle">—</p>
+        </div>
+        <button type="button" id="diffDetailCloseBtn" class="diff-modal-close" aria-label="Chiudi">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+
+      <div class="diff-modal-meta">
+        <div class="diff-meta-item"><span class="diff-meta-label">Stato</span><span id="diffMetaStatus" class="diff-meta-value diff-meta-pill" data-tone="success">—</span></div>
+        <div class="diff-meta-item"><span class="diff-meta-label">Profilo</span><span id="diffMetaProfile" class="diff-meta-value">—</span></div>
+        <div class="diff-meta-item"><span class="diff-meta-label">Data</span><span id="diffMetaDate" class="diff-meta-value">—</span></div>
+        <div class="diff-meta-item"><span class="diff-meta-label">Durata</span><span id="diffMetaDuration" class="diff-meta-value">—</span></div>
+        <div class="diff-meta-item"><span class="diff-meta-label">File</span><span id="diffMetaFile" class="diff-meta-value">—</span></div>
+        <div class="diff-meta-item"><span class="diff-meta-label">Scheda</span><span id="diffMetaSheet" class="diff-meta-value">—</span></div>
+      </div>
+
+      <ul class="diff-stat-grid" id="diffStatGrid">
+        <li class="diff-stat" data-tone="added"><span class="diff-stat-label">Aggiunte</span><span id="diffStatAdded" class="diff-stat-value">0</span></li>
+        <li class="diff-stat" data-tone="modified"><span class="diff-stat-label">Modificate</span><span id="diffStatModified" class="diff-stat-value">0</span></li>
+        <li class="diff-stat" data-tone="removed"><span class="diff-stat-label">Rimosse</span><span id="diffStatRemoved" class="diff-stat-value">0</span></li>
+        <li class="diff-stat" data-tone="muted"><span class="diff-stat-label">Invariate</span><span id="diffStatUnchanged" class="diff-stat-value">0</span></li>
+      </ul>
+
+      <nav class="diff-tabs" role="tablist" aria-label="Sezioni dettaglio">
+        <button type="button" class="diff-tab is-active" role="tab" data-diff-tab="overview" aria-selected="true">Panoramica</button>
+        <button type="button" class="diff-tab" role="tab" data-diff-tab="added" aria-selected="false">Aggiunte <span class="diff-tab-count" id="diffTabAddedCount">0</span></button>
+        <button type="button" class="diff-tab" role="tab" data-diff-tab="modified" aria-selected="false">Modificate <span class="diff-tab-count" id="diffTabModifiedCount">0</span></button>
+        <button type="button" class="diff-tab" role="tab" data-diff-tab="removed" aria-selected="false">Rimosse <span class="diff-tab-count" id="diffTabRemovedCount">0</span></button>
+      </nav>
+
+      <div class="diff-panel" data-diff-panel="overview">
+        <div id="diffOverviewBody" class="diff-overview-body">—</div>
+      </div>
+      <div class="diff-panel" data-diff-panel="added" hidden>
+        <div id="diffAddedList" class="diff-list"></div>
+      </div>
+      <div class="diff-panel" data-diff-panel="modified" hidden>
+        <div id="diffModifiedList" class="diff-list"></div>
+      </div>
+      <div class="diff-panel" data-diff-panel="removed" hidden>
+        <div id="diffRemovedList" class="diff-list"></div>
+      </div>
+
+      <p id="diffTruncatedNote" class="diff-note diff-note-warning" hidden>
+        Diff parziale: il file contiene troppe righe e mostriamo solo le prime modifiche.
+      </p>
+      <p class="diff-note diff-note-privacy">
+        <span class="diff-note-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </span>
+        Queste informazioni restano sul tuo dispositivo.
+      </p>
+    </div>
+  </div>
+
+  <script src="./dashboard-ui.js"></script>
+  <script src="./history-ui.js"></script>
+  <script src="./onboarding-ui.js"></script>
+  <script src="./profiles-ui.js"></script>
+  <script src="./nav-ui.js"></script>
+  <script src="./diff-detail-ui.js"></script>
   <script src="./renderer.js"></script>
 </body>
 </html>

@@ -234,9 +234,9 @@ L’app mostra la versione in interfaccia (footer/impostazioni), allineata a `pa
 
 Per distribuire aggiornamenti via **electron-updater** (GitHub Releases):
 
-1. Incrementa `version` in `package.json` (es. `1.0.0` → `1.0.1`).
-2. Su **Windows**: `npm install` → `npm run dist:win`.
-3. Crea tag Git `v1.0.1` e push: `git tag v1.0.1 && git push origin v1.0.1`.
+1. Incrementa `version` in `package.json` seguendo il [calendar versioning](../../VERSIONING.md) (es. `26.0.0` → `26.0.1`).
+2. Su **Windows**: `npm install` → `npm run dist:win`. In alternativa lascia fare a GitHub Actions con il push del tag (`.github/workflows/release.yaml`).
+3. Crea tag Git `v26.0.1` e push: `git tag v26.0.1 && git push origin v26.0.1`.
 4. Crea una **GitHub Release** sul repo `DanielMatei0/easyfatt-sync` (config in `package.json` → `build.publish`).
 5. Carica **obbligatoriamente** da `dist/`:
    - `Easyfatt-Sync-Windows.exe` (download clienti)

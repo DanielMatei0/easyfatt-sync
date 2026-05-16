@@ -6,15 +6,22 @@ const {
   notifyAutomaticBackupSuccess,
   notifyAutomaticBackupError,
 } = require("./notifications");
-const { isSyncedToday, canRunAutomatedSync, isValidTimeHHMM } = require("./syncState");
+const {
+  anyEnabledProfileSyncedToday,
+  canRunAutomatedSync,
+  isValidTimeHHMM,
+  ensureConfigMigrated,
+  findProfile,
+  getProfilesForAutomation,
+  getEnabledProfiles,
+} = require("./syncState");
 const { createAutomaticBackup, isBackupInProgress } = require("./backup");
 
 const FILE_WATCH_DEBOUNCE_MS = 5000;
 
-let watcher = null;
 let cronJobs = [];
-let fileWatchDebounceTimer = null;
-let fileWatchScheduled = false;
+const watchers = new Map();
+const watchDebounceTimers = new Map();
 
 function stopAllCronJobs() {
   cronJobs.forEach((job) => {
@@ -25,6 +32,20 @@ function stopAllCronJobs() {
     }
   });
   cronJobs = [];
+}
+
+function stopAllWatchers() {
+  watchers.forEach((watcher) => {
+    try {
+      watcher.close();
+    } catch {
+      /* ignore */
+    }
+  });
+  watchers.clear();
+
+  watchDebounceTimers.forEach((timer) => clearTimeout(timer));
+  watchDebounceTimers.clear();
 }
 
 function scheduleCron(time, handler, log, label) {
@@ -76,12 +97,19 @@ function scheduleAutomaticBackup(config, handler, log) {
   log(`Backup automatico attivo (${frequencyLabel} alle ${time}).`);
 }
 
-async function safeSync(config, log, store, onConfigUpdated) {
-  if (!canRunAutomatedSync(config)) {
+async function safeSyncProfile(profileId, log, store, onConfigUpdated, trigger = "auto") {
+  const config = ensureConfigMigrated(store.get("config") || {});
+  const profile = findProfile(config, profileId);
+
+  if (!profile || profile.enabled === false || !canRunAutomatedSync(profile)) {
     return null;
   }
 
-  const result = await runSync(config, log, store);
+  const result = await runSync(profile, log, store, {
+    profileId: profile.id,
+    profileName: profile.name,
+    trigger,
+  });
 
   if (result && typeof onConfigUpdated === "function") {
     onConfigUpdated(store.get("config"));
@@ -94,8 +122,8 @@ function runMissingSyncReminder(config, log, store, time) {
   if (!config?.missingSyncReminderEnabled) return;
   if (config?.notificationsEnabled === false) return;
 
-  const latest = store.get("config") || config;
-  if (isSyncedToday(latest.lastSyncAt)) return;
+  const latest = ensureConfigMigrated(store.get("config") || config);
+  if (anyEnabledProfileSyncedToday(latest)) return;
 
   notifyMissingSyncReminder(time);
   log(`Nessuna sincronizzazione eseguita oggi. Promemoria inviato alle ${time}.`);
@@ -131,10 +159,10 @@ function runAutomaticBackup(store, app, log) {
   }
 }
 
-function scheduleFileWatch(config, log, store, onConfigUpdated) {
-  if (!config.watchEnabled || !config.excelPath) return;
+function scheduleFileWatchForPath(excelPath, profileIds, log, store, onConfigUpdated) {
+  if (!excelPath || !profileIds.length) return;
 
-  watcher = chokidar.watch(config.excelPath, {
+  const watcher = chokidar.watch(excelPath, {
     ignoreInitial: true,
     awaitWriteFinish: {
       stabilityThreshold: 5000,
@@ -143,34 +171,51 @@ function scheduleFileWatch(config, log, store, onConfigUpdated) {
   });
 
   watcher.on("change", () => {
-    if (!canRunAutomatedSync(config)) return;
+    const latest = ensureConfigMigrated(store.get("config") || {});
+    const runnableIds = profileIds.filter((id) => {
+      const p = findProfile(latest, id);
+      return p && p.enabled !== false && p.watchEnabled && canRunAutomatedSync(p);
+    });
 
-    log("File Excel modificato. Avvio sincronizzazione automatica tra pochi secondi...");
-    fileWatchScheduled = true;
+    if (!runnableIds.length) return;
 
-    if (fileWatchDebounceTimer) {
-      clearTimeout(fileWatchDebounceTimer);
+    const names = runnableIds
+      .map((id) => findProfile(latest, id)?.name)
+      .filter(Boolean)
+      .join(", ");
+
+    log(
+      `File Excel modificato (${excelPath}). Sync automatica tra pochi secondi${names ? `: ${names}` : ""}...`
+    );
+
+    const timerKey = excelPath;
+    if (watchDebounceTimers.has(timerKey)) {
+      clearTimeout(watchDebounceTimers.get(timerKey));
     }
 
-    fileWatchDebounceTimer = setTimeout(() => {
-      fileWatchDebounceTimer = null;
-      fileWatchScheduled = false;
+    watchDebounceTimers.set(
+      timerKey,
+      setTimeout(async () => {
+        watchDebounceTimers.delete(timerKey);
 
-      if (isSyncInProgress()) {
-        log("Sincronizzazione già in corso, salto questa esecuzione.");
-        return;
-      }
+        if (isSyncInProgress()) {
+          log("Sincronizzazione già in corso, salto questa esecuzione.");
+          return;
+        }
 
-      const latest = store.get("config") || config;
-      safeSync(latest, log, store, onConfigUpdated);
-    }, FILE_WATCH_DEBOUNCE_MS);
+        for (const profileId of runnableIds) {
+          await safeSyncProfile(profileId, log, store, onConfigUpdated, "watch");
+        }
+      }, FILE_WATCH_DEBOUNCE_MS)
+    );
   });
 
   watcher.on("error", (error) => {
-    log(`Errore monitoraggio file: ${error.message}`);
+    log(`Errore monitoraggio file (${excelPath}): ${error.message}`);
   });
 
-  log("Monitoraggio file attivo.");
+  watchers.set(excelPath, watcher);
+  log(`Monitoraggio file attivo: ${excelPath}`);
 }
 
 function startScheduler(config, log = () => {}, store, onConfigUpdated, app) {
@@ -178,42 +223,62 @@ function startScheduler(config, log = () => {}, store, onConfigUpdated, app) {
 
   if (!config || !store) return;
 
-  if (config.watchEnabled && config.excelPath) {
-    if (canRunAutomatedSync(config)) {
-      scheduleFileWatch(config, log, store, onConfigUpdated);
-    } else {
-      log("Monitoraggio file attivo ma mancano Sheet ID o nome foglio per la sync.");
-    }
-  }
+  const prepared = ensureConfigMigrated(config);
+  const automationProfiles = getProfilesForAutomation(prepared);
 
-  if (config.scheduleEnabled && Array.isArray(config.syncTimes)) {
-    if (!canRunAutomatedSync(config)) {
-      log("Sync programmata attiva ma configurazione incompleta (Excel / Google Sheet).");
-    } else {
-      config.syncTimes.forEach((time) => {
-        const scheduled = scheduleCron(
-          time,
-          () => {
-            log(`Sync programmata ore ${time}`);
-            const latest = store.get("config") || config;
-            safeSync(latest, log, store, onConfigUpdated);
-          },
-          log,
-          "sync"
-        );
-        if (scheduled) {
-          log(`Sync programmata attiva: ${time}`);
-        }
-      });
+  const watchGroups = new Map();
+  automationProfiles.forEach((profile) => {
+    if (!profile.watchEnabled || !profile.excelPath) return;
+    if (!watchGroups.has(profile.excelPath)) {
+      watchGroups.set(profile.excelPath, []);
     }
-  }
+    watchGroups.get(profile.excelPath).push(profile.id);
+  });
 
-  if (config.missingSyncReminderEnabled && Array.isArray(config.reminderTimes)) {
-    config.reminderTimes.forEach((time) => {
+  watchGroups.forEach((profileIds, excelPath) => {
+    const runnable = profileIds.filter((id) => {
+      const p = findProfile(prepared, id);
+      return p && canRunAutomatedSync(p);
+    });
+
+    if (!runnable.length) {
+      log(`Monitoraggio file attivo ma configurazione incompleta per: ${excelPath}`);
+      return;
+    }
+
+    scheduleFileWatchForPath(excelPath, runnable, log, store, onConfigUpdated);
+  });
+
+  getEnabledProfiles(prepared).forEach((profile) => {
+    if (!profile.scheduleEnabled || !Array.isArray(profile.syncTimes)) return;
+
+    if (!canRunAutomatedSync(profile)) {
+      log(`Sync programmata attiva ma configurazione incompleta per "${profile.name}".`);
+      return;
+    }
+
+    profile.syncTimes.forEach((time) => {
       const scheduled = scheduleCron(
         time,
         () => {
-          const latest = store.get("config") || config;
+          log(`[${profile.name}] Sync programmata ore ${time}`);
+          safeSyncProfile(profile.id, log, store, onConfigUpdated, "schedule");
+        },
+        log,
+        `${profile.name} sync`
+      );
+      if (scheduled) {
+        log(`[${profile.name}] Sync programmata attiva: ${time}`);
+      }
+    });
+  });
+
+  if (prepared.missingSyncReminderEnabled && Array.isArray(prepared.reminderTimes)) {
+    prepared.reminderTimes.forEach((time) => {
+      const scheduled = scheduleCron(
+        time,
+        () => {
+          const latest = ensureConfigMigrated(store.get("config") || prepared);
           runMissingSyncReminder(latest, log, store, time);
         },
         log,
@@ -225,13 +290,13 @@ function startScheduler(config, log = () => {}, store, onConfigUpdated, app) {
     });
   }
 
-  if (shouldStartAutomaticBackup(config)) {
+  if (shouldStartAutomaticBackup(prepared)) {
     scheduleAutomaticBackup(
-      config,
+      prepared,
       () => runAutomaticBackup(store, app, log),
       log
     );
-  } else if (config.automaticBackupEnabled) {
+  } else if (prepared.automaticBackupEnabled) {
     log(
       "Backup automatico attivo ma manca la cartella destinazione. Impostala in Backup e ripristino."
     );
@@ -239,31 +304,25 @@ function startScheduler(config, log = () => {}, store, onConfigUpdated, app) {
 }
 
 function stopScheduler() {
-  if (watcher) {
-    watcher.close();
-    watcher = null;
-  }
-
+  stopAllWatchers();
   stopAllCronJobs();
-
-  if (fileWatchDebounceTimer) {
-    clearTimeout(fileWatchDebounceTimer);
-    fileWatchDebounceTimer = null;
-  }
-
-  fileWatchScheduled = false;
 }
 
 function shouldStartScheduler(config) {
   if (!config) return false;
+  const prepared = ensureConfigMigrated(config);
+
+  const hasProfileAutomation = getProfilesForAutomation(prepared).some(
+    (p) => p.watchEnabled || p.scheduleEnabled
+  );
+
   return (
-    config.watchEnabled ||
-    config.scheduleEnabled ||
-    (config.missingSyncReminderEnabled &&
-      Array.isArray(config.reminderTimes) &&
-      config.reminderTimes.length > 0) ||
-    shouldStartAutomaticBackup(config) ||
-    !!config.automaticBackupEnabled
+    hasProfileAutomation ||
+    (prepared.missingSyncReminderEnabled &&
+      Array.isArray(prepared.reminderTimes) &&
+      prepared.reminderTimes.length > 0) ||
+    shouldStartAutomaticBackup(prepared) ||
+    !!prepared.automaticBackupEnabled
   );
 }
 

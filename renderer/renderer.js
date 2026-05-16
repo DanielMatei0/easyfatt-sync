@@ -71,7 +71,12 @@ const SUPPORT_FIELD_ERRORS = {
   email: document.getElementById("supportEmailError"),
   issueType: document.getElementById("supportIssueTypeError"),
   message: document.getElementById("supportMessageError"),
+  diagnosticConsent: document.getElementById("supportDiagnosticConsentError"),
 };
+const supportAttachDiagnostic = document.getElementById("supportAttachDiagnostic");
+const supportDiagnosticConsent = document.getElementById("supportDiagnosticConsent");
+const backupTestBtn = document.getElementById("backupTestBtn");
+const backupFolderWarning = document.getElementById("backupFolderWarning");
 const themeToggle = document.getElementById("themeToggle");
 const themeToggleLabel = document.getElementById("themeToggleLabel");
 const unsavedBanner = document.getElementById("unsavedBanner");
@@ -123,7 +128,23 @@ const LOG_ACTIVITY_RULES = [
     map: (m) => ({
       type: "success",
       title: "Sincronizzazione completata",
-      description: `${m[1]} clienti aggiornati su Google Sheets`,
+      description: `${m[1]} righe aggiornate su Google Sheets`,
+    }),
+  },
+  {
+    test: /^\[([^\]]+)\]\s+Sincronizzazione completata:\s*(\d+)\s*righe/i,
+    map: (m) => ({
+      type: "success",
+      title: `${m[1]} sincronizzato`,
+      description: `${m[2]} righe aggiornate su Google Sheets`,
+    }),
+  },
+  {
+    test: /^\[([^\]]+)\]\s+Errore/i,
+    map: (m, msg) => ({
+      type: "error",
+      title: `Errore sync ${m[1]}`,
+      description: msg.replace(/^\[[^\]]+\]\s*Errore[:\s]*/i, "").trim(),
     }),
   },
   {
@@ -533,9 +554,9 @@ function hasUnsavedChanges() {
 
 function setSyncBusy(busy) {
   isSyncing = busy;
-  syncBtn.disabled = busy;
-  syncBtn.classList.toggle("is-busy", busy);
-  syncBtnLabel.textContent = busy ? SYNC_LABEL_BUSY : SYNC_LABEL_IDLE;
+  if (syncBtn) syncBtn.disabled = busy;
+  if (syncBtn) syncBtn.classList.toggle("is-busy", busy);
+  if (syncBtnLabel) syncBtnLabel.textContent = busy ? SYNC_LABEL_BUSY : SYNC_LABEL_IDLE;
 
   if (saveBtn) saveBtn.disabled = busy;
   if (browseBtn) browseBtn.disabled = busy;
@@ -613,6 +634,7 @@ function updateAutomaticBackupVisibility() {
 }
 
 function updateScheduleVisibility() {
+  if (!scheduleFields || !scheduleEnabledInput) return;
   scheduleFields.classList.toggle("is-hidden", !scheduleEnabledInput.checked);
 }
 
@@ -636,51 +658,28 @@ function updateGoogleAuthUI() {
 }
 
 function updateQuickStats() {
-  const formatted = formatDateTime(lastSyncAt);
+  window.EasyfattProfilesUI?.updateHeroFromProfiles?.();
+  window.EasyfattProfilesUI?.setGoogleHero?.(googleAuthorized);
 
-  heroLastSync.textContent = formatted || "Mai eseguita";
-  heroLastSyncRows.textContent =
-    lastSyncRows != null && formatted
-      ? `${lastSyncRows} clienti`
-      : formatted
-        ? "0 clienti"
-        : "—";
-
-  heroGoogle.textContent = googleAuthorized ? "Collegato" : "Non collegato";
-  heroGoogle.dataset.tone = googleAuthorized ? "active" : "inactive";
-
-  const watchOn = watchEnabledInput.checked;
-  heroWatch.textContent = watchOn ? "Attivo" : "Non attivo";
-  heroWatch.dataset.tone = watchOn ? "active" : "inactive";
-
-  badgeGoogle.textContent = googleAuthorized ? "Google ✓" : "Google ✗";
-  badgeGoogle.dataset.tone = googleAuthorized ? "active" : "inactive";
-
-  badgeWatch.textContent = watchOn ? "Watch ✓" : "Watch ✗";
-  badgeWatch.dataset.tone = watchOn ? "active" : "inactive";
-
-  const scheduleOn = scheduleEnabledInput.checked;
-  badgeSchedule.textContent = scheduleOn ? "Programmata ✓" : "Programmata ✗";
-  badgeSchedule.dataset.tone = scheduleOn ? "active" : "inactive";
-
-  badgeLastSync.textContent = formatted || "Mai eseguita";
+  if (badgeGoogle) {
+    badgeGoogle.textContent = googleAuthorized ? "Google ✓" : "Google ✗";
+    badgeGoogle.dataset.tone = googleAuthorized ? "active" : "inactive";
+  }
 }
 
 function getConfigFromForm() {
+  const profilesData = window.EasyfattProfilesUI?.getProfilesForSave?.() || {
+    syncProfiles: [],
+    activeProfileId: null,
+  };
+
   return {
-    excelPath: excelPathInput.value.trim(),
-    spreadsheetId: spreadsheetIdInput.value.trim(),
-    sheetName: sheetNameInput.value.trim() || "Clienti",
-    watchEnabled: watchEnabledInput.checked,
-    scheduleEnabled: scheduleEnabledInput.checked,
+    ...profilesData,
     openAtLogin: openAtLoginInput.checked,
     notificationsEnabled: notificationsEnabledInput.checked,
     missingSyncReminderEnabled: missingSyncReminderEnabledInput.checked,
-    syncTimes: parseTimesList(syncTimesInput.value),
     reminderTimes: parseTimesList(reminderTimesInput.value),
     theme: document.body.dataset.theme || "dark",
-    lastSyncAt: lastSyncAt || undefined,
-    lastSyncRows: lastSyncRows != null ? lastSyncRows : undefined,
     automaticBackupEnabled: !!automaticBackupEnabledInput?.checked,
     automaticBackupFrequency: automaticBackupFrequencyInput?.value || "daily",
     automaticBackupTime: automaticBackupTimeInput?.value.trim() || "20:00",
@@ -694,15 +693,11 @@ function getConfigFromForm() {
 
 function configSnapshot(config) {
   return JSON.stringify({
-    excelPath: config.excelPath || "",
-    spreadsheetId: config.spreadsheetId || "",
-    sheetName: config.sheetName || "Clienti",
-    watchEnabled: !!config.watchEnabled,
-    scheduleEnabled: !!config.scheduleEnabled,
+    syncProfiles: config.syncProfiles || [],
+    activeProfileId: config.activeProfileId || null,
     openAtLogin: !!config.openAtLogin,
     notificationsEnabled: config.notificationsEnabled !== false,
     missingSyncReminderEnabled: config.missingSyncReminderEnabled !== false,
-    syncTimes: config.syncTimes || [],
     reminderTimes: config.reminderTimes || [],
     theme: config.theme || "dark",
     automaticBackupEnabled: !!config.automaticBackupEnabled,
@@ -720,21 +715,25 @@ function updateUnsavedState() {
 }
 
 function applySyncMeta(config) {
-  lastSyncAt = config.lastSyncAt || null;
-  lastSyncRows = config.lastSyncRows != null ? config.lastSyncRows : null;
+  const active =
+    (config.syncProfiles || []).find((p) => p.id === config.activeProfileId) ||
+    (config.syncProfiles || [])[0];
+  lastSyncAt = active?.lastSyncAt || config.lastSyncAt || null;
+  lastSyncRows = active?.lastSyncRows != null ? active.lastSyncRows : config.lastSyncRows ?? null;
 }
 
 function setFormFromConfig(config) {
-  excelPathInput.value = config.excelPath || "";
-  spreadsheetIdInput.value = config.spreadsheetId || "";
-  sheetNameInput.value = config.sheetName || "Clienti";
-  watchEnabledInput.checked = !!config.watchEnabled;
-  scheduleEnabledInput.checked = !!config.scheduleEnabled;
-  openAtLoginInput.checked = !!config.openAtLogin;
-  notificationsEnabledInput.checked = config.notificationsEnabled !== false;
-  missingSyncReminderEnabledInput.checked = config.missingSyncReminderEnabled !== false;
-  syncTimesInput.value = (config.syncTimes || ["09:00", "13:00", "18:00"]).join("\n");
-  reminderTimesInput.value = (config.reminderTimes || ["12:00", "19:00"]).join("\n");
+  window.EasyfattProfilesUI?.setProfilesFromConfig?.(config);
+  if (openAtLoginInput) openAtLoginInput.checked = !!config.openAtLogin;
+  if (notificationsEnabledInput) {
+    notificationsEnabledInput.checked = config.notificationsEnabled !== false;
+  }
+  if (missingSyncReminderEnabledInput) {
+    missingSyncReminderEnabledInput.checked = config.missingSyncReminderEnabled !== false;
+  }
+  if (reminderTimesInput) {
+    reminderTimesInput.value = (config.reminderTimes || ["12:00", "19:00"]).join("\n");
+  }
   if (automaticBackupEnabledInput) {
     automaticBackupEnabledInput.checked = !!config.automaticBackupEnabled;
   }
@@ -789,6 +788,12 @@ function openAccordionItem(item) {
   const trigger = item.querySelector(".accordion-trigger");
   item.classList.add("is-open");
   trigger?.setAttribute("aria-expanded", "true");
+
+  // Se l'item è stato spostato dentro una app-view, naviga a quella view
+  const view = item.closest(".app-view");
+  if (view && view.dataset.view && window.EasyfattNavUI?.setActiveView) {
+    window.EasyfattNavUI.setActiveView(view.dataset.view);
+  }
 }
 
 function bindAccordions() {
@@ -851,13 +856,16 @@ async function initLegalGate() {
 }
 
 async function initAppVersion() {
+  const sidebarAppVersion = document.getElementById("sidebarAppVersion");
   try {
     const version = await window.easyfattSync.getAppVersion();
     if (footerAppVersion) footerAppVersion.textContent = version;
     if (settingsAppVersion) settingsAppVersion.textContent = version;
+    if (sidebarAppVersion) sidebarAppVersion.textContent = version;
   } catch {
     if (footerAppVersion) footerAppVersion.textContent = "—";
     if (settingsAppVersion) settingsAppVersion.textContent = "—";
+    if (sidebarAppVersion) sidebarAppVersion.textContent = "—";
   }
 }
 
@@ -1115,6 +1123,16 @@ function validateSupportFormClient() {
     valid = false;
   }
 
+  const attachDiagnostic = !!supportAttachDiagnostic?.checked;
+  const diagnosticConsent = !!supportDiagnosticConsent?.checked;
+  if (attachDiagnostic && !diagnosticConsent) {
+    setSupportFieldError(
+      "diagnosticConsent",
+      "Per allegare il report diagnostico devi autorizzare l’invio delle informazioni tecniche."
+    );
+    valid = false;
+  }
+
   return valid;
 }
 
@@ -1178,6 +1196,21 @@ async function refreshBackupStatusText() {
     backupStatusText.textContent = parts.length
       ? parts.join(" · ")
       : "Nessun backup o ripristino registrato in questa installazione.";
+
+    if (backupFolderWarning) {
+      if (meta.automaticBackupEnabled && !meta.automaticBackupFolder) {
+        backupFolderWarning.hidden = false;
+        backupFolderWarning.textContent =
+          "Backup automatico attivo ma cartella non configurata.";
+      } else if (meta.automaticBackupEnabled && meta.automaticBackupFolder && !meta.folderOk) {
+        backupFolderWarning.hidden = false;
+        backupFolderWarning.textContent =
+          "La cartella backup automatico non è raggiungibile. Verifica il percorso.";
+      } else {
+        backupFolderWarning.hidden = true;
+        backupFolderWarning.textContent = "";
+      }
+    }
   } catch {
     backupStatusText.textContent = "—";
   }
@@ -1232,6 +1265,26 @@ function bindBackupUI() {
     if (folder && automaticBackupFolderInput) {
       automaticBackupFolderInput.value = folder;
       updateUnsavedState();
+    }
+  });
+
+  backupTestBtn?.addEventListener("click", async () => {
+    backupTestBtn.disabled = true;
+    try {
+      const result = await window.easyfattSync.testBackup();
+      if (result?.ok) {
+        setStatus("Test backup completato con successo.", "success");
+        addActivity({
+          type: "success",
+          title: "Test backup OK",
+          description: "La creazione backup funziona correttamente.",
+        });
+      } else {
+        setStatus(result?.message || "Test backup non riuscito.", "error");
+      }
+      await refreshBackupStatusText();
+    } finally {
+      backupTestBtn.disabled = false;
     }
   });
 
@@ -1293,6 +1346,14 @@ function bindBackupUI() {
       if (preview.createdAt) {
         const when = formatDateTime(preview.createdAt);
         if (when) hints.push(`Backup del ${when}.`);
+      }
+
+      if (preview.profileCount != null) {
+        hints.push(`${preview.profileCount} connessioni nel backup.`);
+      }
+
+      if (preview.appVersion) {
+        hints.push(`Versione app: ${preview.appVersion}.`);
       }
 
       if (preview.googleTokenIncluded) {
@@ -1418,6 +1479,8 @@ function bindSupportModal() {
         phone: supportPhoneInput?.value.trim() || "",
         issueType: supportIssueTypeInput.value,
         message: supportMessageInput.value.trim(),
+        attachDiagnostic: !!supportAttachDiagnostic?.checked,
+        diagnosticConsent: !!supportDiagnosticConsent?.checked,
       });
 
       if (result?.validationErrors) {
@@ -1467,15 +1530,9 @@ function bindSupportModal() {
 
 function bindFormListeners() {
   const inputs = [
-    excelPathInput,
-    spreadsheetIdInput,
-    sheetNameInput,
-    watchEnabledInput,
-    scheduleEnabledInput,
     openAtLoginInput,
     notificationsEnabledInput,
     missingSyncReminderEnabledInput,
-    syncTimesInput,
     reminderTimesInput,
     automaticBackupEnabledInput,
     automaticBackupFrequencyInput,
@@ -1496,8 +1553,12 @@ function bindFormListeners() {
     });
   });
 
-  scheduleEnabledInput.addEventListener("change", updateScheduleVisibility);
-  missingSyncReminderEnabledInput.addEventListener("change", updateReminderVisibility);
+  if (scheduleEnabledInput) {
+    scheduleEnabledInput.addEventListener("change", updateScheduleVisibility);
+  }
+  if (missingSyncReminderEnabledInput) {
+    missingSyncReminderEnabledInput.addEventListener("change", updateReminderVisibility);
+  }
 }
 
 themeToggle.addEventListener("click", async () => {
@@ -1516,20 +1577,29 @@ window.easyfattSync.onLog((message) => {
 window.easyfattSync.onConfigUpdated((config) => {
   if (hasUnsavedChanges()) {
     applySyncMeta(config);
+    window.EasyfattProfilesUI?.setProfilesFromConfig?.(config);
     updateQuickStats();
+    window.EasyfattDashboardUI?.refresh?.();
     return;
   }
   setFormFromConfig(config);
 });
 
-browseBtn.addEventListener("click", async () => {
-  const path = await window.easyfattSync.selectExcel();
-  if (path) {
-    excelPathInput.value = path;
-    updateUnsavedState();
-    updateQuickStats();
-  }
+window.easyfattSync.onHistoryUpdated?.(() => {
+  window.EasyfattHistoryUI?.refresh?.();
+  window.EasyfattDashboardUI?.refresh?.();
 });
+
+if (browseBtn && excelPathInput) {
+  browseBtn.addEventListener("click", async () => {
+    const path = await window.easyfattSync.selectExcel();
+    if (path) {
+      excelPathInput.value = path;
+      updateUnsavedState();
+      updateQuickStats();
+    }
+  });
+}
 
 saveBtn.addEventListener("click", async () => {
   try {
@@ -1588,56 +1658,15 @@ logoutBtn.addEventListener("click", async () => {
   }
 });
 
-syncBtn.addEventListener("click", async () => {
-  if (isSyncing) return;
-
-  try {
-    setSyncBusy(true);
-    setStatus("Sincronizzazione in corso...", "busy");
-    addActivity({
-      type: "syncing",
-      title: "Sincronizzazione in corso",
-      description: "Lettura file Excel e aggiornamento Google Sheet...",
-    });
-
-    await window.easyfattSync.saveConfig(getConfigFromForm());
-    const result = await window.easyfattSync.syncNow();
-
-    if (result?.skipped) {
-      setStatus("Sincronizzazione già in corso.", "busy");
-      addActivity({
-        type: "info",
-        title: "Sincronizzazione già attiva",
-        description: "Un’altra sincronizzazione è già in corso.",
-      });
-      return;
-    }
-
-    const config = await window.easyfattSync.getConfig();
-    setFormFromConfig(config);
-
-    setSyncProgressUI(100, "Completato", false);
-    setStatus(`Sincronizzazione completata: ${result.rows} clienti aggiornati`, "success");
-    addActivity({
-      type: "success",
-      title: "Sincronizzazione completata",
-      description: `${result.rows} clienti aggiornati su Google Sheets`,
-    });
-  } catch (error) {
-    const msg = error.message || "Si è verificato un problema.";
-    setStatus(msg, "error");
-    addActivity({
-      type: "error",
-      title: "Errore",
-      description: friendlyStatusText(msg),
-    });
-  } finally {
-    setSyncBusy(false);
-    hideSyncProgress();
-  }
-});
-
 (async function init() {
+  window.EasyfattAppHooks = {
+    setStatus,
+    setSyncBusy,
+    setSyncProgressUI,
+    hideSyncProgress,
+    addActivity,
+  };
+
   bindAccordions();
   bindFormListeners();
   bindExternalLinks();
@@ -1651,6 +1680,10 @@ syncBtn.addEventListener("click", async () => {
 
   const config = await window.easyfattSync.getConfig();
   setFormFromConfig(config);
+  window.EasyfattHistoryUI?.populateProfileFilter?.(config);
+  window.EasyfattHistoryUI?.refresh?.();
+  window.EasyfattDashboardUI?.refresh?.();
+  window.EasyfattOnboardingUI?.maybeStart?.(config);
 
   const authorized = await refreshGoogleStatus();
 

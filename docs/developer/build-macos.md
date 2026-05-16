@@ -26,7 +26,7 @@ Per distribuzione pubblica esterna, vedi [Firma e notarizzazione (futuro)](./mac
 npm run dist:mac
 ```
 
-In `dist/` (es. `version: "1.0.0"`):
+In `dist/` (es. `version: "26.0.0"`):
 
 | File | Uso |
 |------|-----|
@@ -123,7 +123,7 @@ Per ogni release che supporta **Windows e macOS**, allega **tutti** gli asset ri
 | Windows | `Easyfatt-Sync-Windows.exe`, `latest.yml`, `Easyfatt-Sync-Windows.exe.blockmap` |
 | macOS | `Easyfatt-Sync-macOS-arm64.dmg` (e/o `x64`), `latest-mac.yml`, `.blockmap` corrispondenti |
 
-Tag consigliato: `vX.Y.Z` (es. `v1.0.1`).
+Tag consigliato: `vX.Y.Z` (es. `v26.0.0`). Calendar versioning — vedi [`VERSIONING.md`](../../VERSIONING.md).
 
 `build.publish` in `package.json` punta a `DanielMatei0/easyfatt-sync`.
 

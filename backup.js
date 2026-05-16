@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { getDefaultConfig } = require("./syncState");
+const { getDefaultConfig, ensureConfigMigrated } = require("./syncState");
 const {
   readGoogleToken,
   writeGoogleToken,
@@ -278,12 +278,17 @@ function previewBackup(filePath) {
 
   const backup = validation.data;
 
+  const profiles = backup.config?.syncProfiles;
+  const profileCount = Array.isArray(profiles) ? profiles.length : 0;
+
   return {
     ok: true,
     filePath,
     createdAt: backup.createdAt || null,
     appVersion: backup.appVersion || null,
     googleTokenIncluded: !!backup.googleTokenIncluded,
+    profileCount,
+    backupType: backup.backupType || "manual",
   };
 }
 
@@ -311,7 +316,10 @@ function restoreBackup(store, filePath, log = () => {}) {
   const backup = validation.data;
 
   try {
-    store.set("config", { ...getDefaultConfig(), ...backup.config });
+    store.set(
+      "config",
+      ensureConfigMigrated({ ...getDefaultConfig(), ...backup.config })
+    );
     store.set("legalAccepted", backup.legalAccepted === true);
     store.set("legalAcceptedAt", backup.legalAcceptedAt || null);
     store.set("legalVersion", backup.legalVersion || null);

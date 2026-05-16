@@ -30,9 +30,8 @@ function buildClearRange(sheetName, columnCount) {
   return buildSheetRange(sheetName, columnCount, 1);
 }
 
-function buildUpdateRange(sheetName) {
-  const safeName = escapeSheetName(sheetName);
-  return `'${safeName}'!A1`;
+function buildUpdateRange(sheetName, columnCount) {
+  return buildSheetRange(sheetName, columnCount, 1);
 }
 
 module.exports = {

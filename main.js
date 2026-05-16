@@ -7,12 +7,16 @@ const {
   logoutGoogle,
 } = require("./auth");
 const { startScheduler, stopScheduler, shouldStartScheduler } = require("./scheduler");
-const { runSync } = require("./syncRunner");
+const { runSync, runSyncAll } = require("./syncRunner");
 const {
   mergeConfig,
   getDefaultConfig,
   prepareConfigForScheduler,
   canRunAutomatedSync,
+  ensureConfigMigrated,
+  getActiveProfile,
+  findProfile,
+  validateSyncProfiles,
 } = require("./syncState");
 const { LEGAL_VERSION } = require("./legalConstants");
 const {
@@ -30,6 +34,19 @@ const {
   restoreBackup,
 } = require("./backup");
 const { toClientMessage } = require("./errors");
+const { computeHealthStatus } = require("./healthStatus");
+const {
+  getHistory,
+  filterHistory,
+  exportHistoryReport,
+  getDiffDetails,
+  clearHistory,
+} = require("./syncHistory");
+const { pruneOrphanSnapshots, clearAllSnapshots } = require("./syncSnapshots");
+const { previewExcelFile } = require("./excelUtils");
+const { buildDiagnosticReport } = require("./diagnostics");
+const fs = require("fs");
+const os = require("os");
 
 const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 
@@ -37,6 +54,12 @@ const store = new Store();
 const APP_ICON_PATH = path.join(__dirname, "assets", "icon.png");
 
 let mainWindow;
+
+function sendHistoryUpdated() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("history-updated", getHistory(store));
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -97,7 +120,7 @@ app.whenReady().then(() => {
   }
 
   createWindow();
-  const config = store.get("config") || getDefaultConfig();
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   const prepared = restartScheduler(config);
   store.set("config", prepared);
   applyOpenAtLoginSetting(prepared.openAtLogin, sendLog);
@@ -115,13 +138,29 @@ app.on("window-all-closed", () => {
 });
 
 ipcMain.handle("get-config", () => {
-  return store.get("config") || getDefaultConfig();
+  return ensureConfigMigrated(store.get("config") || getDefaultConfig());
 });
 
 ipcMain.handle("save-config", async (_, config) => {
+  if (config?.syncProfiles) {
+    const validation = validateSyncProfiles(config.syncProfiles);
+    if (!validation.ok) {
+      throw new Error(validation.errors[0]);
+    }
+    config.syncProfiles = validation.profiles;
+  }
+
   const merged = mergeConfig(store, config);
   const prepared = restartScheduler(merged);
   store.set("config", prepared);
+
+  // Pulisci snapshot orfani (profili eliminati)
+  try {
+    const validIds = (prepared.syncProfiles || []).map((p) => p.id).filter(Boolean);
+    pruneOrphanSnapshots(store, validIds);
+  } catch (_) {
+    /* non bloccante */
+  }
 
   applyOpenAtLoginSetting(prepared.openAtLogin, sendLog);
   sendConfigUpdated(prepared);
@@ -168,24 +207,59 @@ ipcMain.handle("logout-google", async () => {
   return logoutGoogle();
 });
 
-ipcMain.handle("sync-now", async () => {
-  const config = store.get("config") || getDefaultConfig();
+ipcMain.handle("sync-now", async (_, payload) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  const profileId = payload?.profileId;
+  const profile = profileId
+    ? findProfile(config, profileId)
+    : getActiveProfile(config);
 
-  if (!canRunAutomatedSync(config)) {
-    throw new Error("Config incompleta: seleziona file Excel, Sheet ID e nome foglio.");
+  if (!profile) {
+    throw new Error("Nessun profilo di sincronizzazione configurato.");
+  }
+
+  if (!canRunAutomatedSync(profile)) {
+    throw new Error(
+      `Config incompleta per "${profile.name}": file Excel, Sheet ID e nome foglio.`
+    );
   }
 
   try {
-    const result = await runSync(config, sendLog, store);
+    const result = await runSync(profile, sendLog, store, {
+      profileId: profile.id,
+      profileName: profile.name,
+      trigger: "manual",
+    });
 
     if (result?.skipped) {
-      return { ok: true, rows: 0, skipped: true };
+      return { ok: true, rows: 0, skipped: true, profileId: profile.id };
     }
 
     const updated = store.get("config");
     sendConfigUpdated(updated);
+    sendHistoryUpdated();
     return result;
   } catch (error) {
+    sendHistoryUpdated();
+    throw new Error(toClientMessage(error, "sync"));
+  }
+});
+
+ipcMain.handle("sync-all", async () => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+
+  if (!canRunAutomatedSync(config)) {
+    throw new Error("Nessun profilo pronto per la sincronizzazione.");
+  }
+
+  try {
+    const result = await runSyncAll(config, sendLog, store);
+    const updated = store.get("config");
+    sendConfigUpdated(updated);
+    sendHistoryUpdated();
+    return result;
+  } catch (error) {
+    sendHistoryUpdated();
     throw new Error(toClientMessage(error, "sync"));
   }
 });
@@ -236,17 +310,39 @@ ipcMain.handle("install-update-now", () => {
 });
 
 ipcMain.handle("submit-support-request", async (_, form) => {
-  const config = store.get("config") || getDefaultConfig();
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  const active = getActiveProfile(config);
+  const profiles = config.syncProfiles || [];
+
+  let diagnosticReport = null;
+  if (form?.attachDiagnostic && form?.diagnosticConsent) {
+    diagnosticReport = buildDiagnosticReport({
+      store,
+      app,
+      googleAuthorized: isGoogleAuthorized(),
+      backupMeta: {
+        lastCreatedAt: store.get("backupLastCreatedAt") || null,
+        lastRestoredAt: store.get("backupLastRestoredAt") || null,
+        lastAutomaticAt: store.get("backupLastAutomaticAt") || null,
+      },
+    });
+  }
 
   return submitSupportRequest(form, {
     appVersion: app.getVersion(),
     platform: process.platform,
     platformLabel: getPlatformLabel(),
-    lastSyncAt: config.lastSyncAt || null,
-    lastSyncRows: config.lastSyncRows != null ? config.lastSyncRows : null,
+    lastSyncAt: active?.lastSyncAt || config.lastSyncAt || null,
+    lastSyncRows:
+      active?.lastSyncRows != null ? active.lastSyncRows : config.lastSyncRows ?? null,
     googleAuthorized: isGoogleAuthorized(),
-    excelPath: config.excelPath || "",
-    sheetName: config.sheetName || "",
+    excelPath: active?.excelPath || "",
+    sheetName: active?.sheetName || "",
+    syncProfileCount: profiles.length,
+    syncProfileNames: profiles.map((p) => p.name).filter(Boolean),
+    activeProfileId: active?.id || config.activeProfileId || null,
+    activeProfileName: active?.name || null,
+    diagnosticReport,
   });
 });
 
@@ -324,7 +420,8 @@ ipcMain.handle("backup-restore", async (_, filePath) => {
     return result;
   }
 
-  const config = store.get("config") || getDefaultConfig();
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  store.set("config", config);
   applyOpenAtLoginSetting(config.openAtLogin, sendLog);
   restartScheduler(config);
   sendConfigUpdated(config);
@@ -340,9 +437,117 @@ ipcMain.handle("backup-restore", async (_, filePath) => {
 });
 
 ipcMain.handle("get-backup-meta", () => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  const folder = config.automaticBackupFolder || "";
+  let folderOk = false;
+  if (folder) {
+    try {
+      folderOk = fs.existsSync(folder) && fs.statSync(folder).isDirectory();
+    } catch {
+      folderOk = false;
+    }
+  }
+
   return {
     lastCreatedAt: store.get("backupLastCreatedAt") || null,
     lastRestoredAt: store.get("backupLastRestoredAt") || null,
     lastAutomaticAt: store.get("backupLastAutomaticAt") || null,
+    automaticBackupEnabled: !!config.automaticBackupEnabled,
+    automaticBackupFolder: folder,
+    folderOk,
   };
 });
+
+ipcMain.handle("get-health-status", async () => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  const history = getHistory(store);
+  return computeHealthStatus({
+    config,
+    googleAuthorized: isGoogleAuthorized(),
+    history,
+  });
+});
+
+ipcMain.handle("get-sync-history", (_, filters) => {
+  const history = getHistory(store);
+  return filterHistory(history, filters || {});
+});
+
+ipcMain.handle("get-history-diff", (_, eventId) => {
+  if (!eventId) return null;
+  return getDiffDetails(store, eventId);
+});
+
+ipcMain.handle("clear-sync-history", () => {
+  clearHistory(store);
+  clearAllSnapshots(store);
+  sendHistoryUpdated();
+  return { ok: true };
+});
+
+ipcMain.handle("export-sync-history", async (_, filters) => {
+  const history = getHistory(store);
+  const report = exportHistoryReport(history, filters || {});
+
+  const saveResult = await dialog.showSaveDialog(mainWindow, {
+    title: "Esporta cronologia sync",
+    defaultPath: `easyfatt-sync-history-${new Date().toISOString().slice(0, 10)}.json`,
+    filters: [{ name: "Report JSON", extensions: ["json"] }],
+  });
+
+  if (saveResult.canceled || !saveResult.filePath) {
+    return { ok: false, canceled: true };
+  }
+
+  fs.writeFileSync(saveResult.filePath, JSON.stringify(report, null, 2), "utf8");
+  return { ok: true, filePath: saveResult.filePath };
+});
+
+ipcMain.handle("preview-excel", async (_, excelPath) => {
+  if (!excelPath) {
+    throw new Error("Seleziona un file Excel.");
+  }
+  try {
+    return await previewExcelFile(excelPath, 5);
+  } catch (error) {
+    throw new Error(toClientMessage(error, "sync"));
+  }
+});
+
+ipcMain.handle("build-diagnostic-report", () => {
+  return buildDiagnosticReport({
+    store,
+    app,
+    googleAuthorized: isGoogleAuthorized(),
+    backupMeta: {
+      lastCreatedAt: store.get("backupLastCreatedAt") || null,
+      lastRestoredAt: store.get("backupLastRestoredAt") || null,
+      lastAutomaticAt: store.get("backupLastAutomaticAt") || null,
+    },
+  });
+});
+
+ipcMain.handle("backup-test", async () => {
+  const dir = path.join(os.tmpdir(), "easyfatt-sync-backup-test");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const filePath = path.join(dir, buildSuggestedBackupFilename());
+
+  const result = createBackup(
+    store,
+    app,
+    filePath,
+    { backupType: "manual", includeGoogleToken: false },
+    sendLog
+  );
+
+  if (result.ok && fs.existsSync(filePath)) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      /* ignore cleanup */
+    }
+  }
+
+  return result;
+});
+

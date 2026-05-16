@@ -1,26 +1,30 @@
-# Easyfatt Sync — Guida per l’utente
+# Easyfatt Sync — Guida per l'utente
 
-Questa guida spiega come usare **Easyfatt Sync**, l’applicazione di Aven Labs che aggiorna automaticamente un foglio **Google Sheets** con i clienti esportati da **Easyfatt**.
+*Versione documentazione allineata a Easyfatt Sync **26.0.0** (2026).*
 
-Non serve essere esperti di informatica: segui i passaggi in ordine la prima volta, poi l’app lavorerà in automatico per te.
+Questa guida spiega come usare **Easyfatt Sync**, l'applicazione di Aven Labs che aggiorna automaticamente un foglio **Google Sheets** con i clienti esportati da **Easyfatt**.
+
+Non serve essere esperti di informatica: segui i passaggi in ordine la prima volta, poi l'app lavorerà in automatico per te.
 
 ---
 
 ## Indice
 
-1. [Cos’è Easyfatt Sync](#1-cosè-easyfatt-sync)
+1. [Cos'è Easyfatt Sync](#1-cosè-easyfatt-sync)
 2. [Requisiti](#2-requisiti)
 3. [Installazione](#3-installazione)
 4. [Collegamento Google](#4-collegamento-google)
 5. [Configurazione](#5-configurazione)
-6. [Sincronizzazione](#6-sincronizzazione)
-7. [Notifiche](#7-notifiche)
-8. [Backup](#8-backup)
-9. [Aggiornamenti](#9-aggiornamenti)
-10. [Supporto](#10-supporto)
-11. [Privacy](#11-privacy)
-12. [Risoluzione problemi](#12-risoluzione-problemi)
-13. [Contatti](#13-contatti)
+6. [Più sincronizzazioni (profili)](#6-più-sincronizzazioni-profili)
+7. [Sincronizzazione](#7-sincronizzazione)
+8. [Cronologia e dettaglio sync](#8-cronologia-e-dettaglio-sync)
+9. [Notifiche](#9-notifiche)
+10. [Backup](#10-backup)
+11. [Aggiornamenti](#11-aggiornamenti)
+12. [Supporto](#12-supporto)
+13. [Privacy](#13-privacy)
+14. [Risoluzione problemi](#14-risoluzione-problemi)
+15. [Contatti](#15-contatti)
 
 ---
 
@@ -162,10 +166,81 @@ Clicca **Salva impostazioni** in fondo alla colonna impostazioni. Senza salvare,
 | Monitoraggio file         | Sync automatica quando il file Excel cambia                          |
 | Sync programmata          | Sync a orari fissi (es. 09:00, 13:00, 18:00)                         |
 
+### Dashboard “Stato sistema”
+
+In cima all’app trovi la risposta a **“Sta funzionando tutto?”**:
+
+- **Operativo** — tutto ok
+- **Attenzione** — qualcosa da verificare (es. nessuna sync oggi)
+- **Errore** — problema da risolvere (es. Google non collegato)
+
+Vedi anche ultima sync, prossima sync programmata, connessioni attive, file monitorati, righe sincronizzate oggi e stato Google.
+
+### Configurazione guidata
+
+Se non hai ancora nessuna sincronizzazione configurata, vedrai un grande pulsante **Inizia configurazione guidata** nella dashboard. Il wizard ti aiuta in 6 passi:
+
+1. **Benvenuto** — anteprima di cosa farai
+2. **Google** — colleghi il tuo account (saltato in automatico se già collegato)
+3. **File Excel** — scegli il file esportato da Easyfatt; controlliamo che sia leggibile
+4. **Foglio Google** — incolla il codice del foglio (puoi anche incollare l’intero URL: lo estraiamo noi)
+5. **Verifica** — controlliamo file, Google e foglio
+6. **Riepilogo + prima sync** — confermi e parte la sincronizzazione
+
+Puoi **saltare** il wizard in qualsiasi momento: non viene creato nessun profilo vuoto e non lo rivedrai più all’avvio.
+
+Per riaprirlo, clicca **Apri configurazione guidata** dalla sezione *Connessioni sync*.
+
+### Mapping colonne (opzionale)
+
+Nella modifica connessione, apri **Mapping colonne**:
+
+1. Clicca **Carica intestazioni dal file**
+2. Controlla l’anteprima delle prime righe
+3. Assegna ogni colonna Excel alla colonna desiderata su Google Sheets
+
+Se non configuri il mapping, le colonne Excel vengono copiate con lo stesso nome.
 
 ---
 
-## 6. Sincronizzazione
+## 6. Più sincronizzazioni (profili)
+
+Easyfatt Sync supporta **più sincronizzazioni nella stessa app**. Ogni "profilo" collega un file Excel a un foglio Google Sheets ed ha le sue automazioni.
+
+### Aggiungere una nuova sincronizzazione
+
+1. Vai nella sezione **Connessioni sync**.
+2. Clicca **Aggiungi sincronizzazione** (oppure **Apri configurazione guidata** se è la prima).
+3. Compila:
+   - **Nome** (es. `Clienti negozio`, `Clienti b2b`)
+   - **File Excel** (esportato da Easyfatt)
+   - **ID foglio Google** e **Nome scheda**
+   - (Opzionale) **Mapping colonne**
+4. **Salva impostazioni**.
+
+Quando hai già almeno un profilo, il pulsante grande in dashboard diventa **"Configura un'altra sincronizzazione"**.
+
+### Modificare o eliminare una sincronizzazione
+
+- Nella card del profilo: **Modifica** per cambiare i dati, **Elimina** per rimuoverlo.
+- L'eliminazione cancella **anche gli snapshot** locali di quel profilo (vedi [Cronologia](#8-cronologia-e-dettaglio-sync)).
+
+### Come trovare l'ID di un Google Sheet
+
+Apri il foglio in Google Sheets. L'URL ha questa forma:
+
+```text
+https://docs.google.com/spreadsheets/d/1AbCdEfG_h-iJkLmNoPqRsTuVwXyZ123456/edit#gid=0
+                                       └──────── ID del foglio ────────────┘
+```
+
+L'**ID foglio Google** è la parte tra `/d/` e `/edit`. Copiala e incollala nel campo apposito. Puoi anche incollare l'**intero URL**: il wizard estrae l'ID automaticamente.
+
+Il **nome scheda** è il nome della tab in basso (es. `Clienti`, `Foglio1`).
+
+---
+
+## 7. Sincronizzazione
 
 ### Sincronizzazione manuale
 
@@ -193,11 +268,60 @@ Se attivi **Sync programmata**:
 
 ### Cosa succede durante la sync
 
-L’app legge l’Excel, si collega a Google e **aggiorna il foglio** con i dati attuali. L’operazione può richiedere da pochi secondi a qualche minuto se ci sono molti clienti.
+L'app legge l'Excel, si collega a Google e **aggiorna il foglio** con i dati attuali. L'operazione può richiedere da pochi secondi a qualche minuto se ci sono molti clienti.
 
 ---
 
-## 7. Notifiche
+## 8. Cronologia e dettaglio sync
+
+Nella sezione **Cronologia sync** trovi tutti gli eventi delle ultime sincronizzazioni (fino agli ultimi 500).
+
+### Cosa vedi nella lista
+
+Per ogni evento:
+
+- **Stato** (successo / errore)
+- **Profilo** che ha sincronizzato
+- **Data e ora**
+- **Durata**
+- **Numero righe** sincronizzate
+- **Mini badge** che riassumono le modifiche: **+ aggiunte**, **~ modificate**, **− rimosse**
+
+### Filtri ed export
+
+- Filtra per **profilo** o per **stato**.
+- Clicca **Esporta report** per salvare un file JSON di archivio o da allegare al supporto.
+- Clicca **Pulisci cronologia** per azzerare cronologia e snapshot locali.
+
+### Vedere cosa è cambiato — **Dettaglio sincronizzazione**
+
+Clicca su un evento della cronologia per aprire la **finestra Dettaglio sincronizzazione**, che ti mostra **esattamente cosa è cambiato** rispetto alla sync precedente.
+
+La finestra contiene:
+
+1. **Riepilogo**: stato, profilo, data, durata, file e foglio.
+2. **Conteggi**: righe aggiunte, modificate, rimosse, invariate.
+3. **Tre tab** con il confronto stile *GitHub diff*:
+   - **Aggiunte** (verde) — clienti / righe comparsi rispetto alla volta prima.
+   - **Modificate** (giallo) — per ciascun cliente cambiato vedi i singoli campi con `Prima → Dopo`.
+   - **Rimosse** (rosso) — clienti / righe spariti dal file.
+
+#### Come funziona dietro le quinte
+
+Prima di ogni sincronizzazione, l'app salva una **fotografia locale** (snapshot) delle righe del tuo Excel. Alla sync successiva confronta la fotografia precedente con quella nuova e ti mostra le differenze.
+
+> La prima sync di un profilo non ha una fotografia precedente, quindi il dettaglio è semplicemente **"Primo snapshot"** (tutte le righe sono "stato iniziale", non "aggiunte" in senso di confronto).
+
+#### Privacy del dettaglio
+
+- Le fotografie restano **solo sul tuo computer**.
+- **Non** sono inviate ad Aven Labs, anche con le richieste di supporto.
+- **Non** sono incluse nei backup di default.
+- Puoi cancellarle in qualunque momento con **Pulisci cronologia**.
+
+---
+
+## 9. Notifiche
 
 ### Notifiche desktop
 
@@ -211,11 +335,11 @@ Se **Notifiche desktop** è attiva:
 Se attivi **Promemoria se nessuna sync oggi**:
 
 - Negli orari che imposti (es. 12:00 e 19:00) l’app ti avvisa **solo se** in quel giorno non hai ancora sincronizzato.
-- Serve a non dimenticare l’aggiornamento del foglio Google.
+- Serve a non dimenticare l'aggiornamento del foglio Google.
 
 ---
 
-## 8. Backup
+## 10. Backup
 
 Il backup salva le **impostazioni dell’app** (percorsi, orari, preferenze), non il file Excel e non il contenuto del foglio Google.
 
@@ -246,9 +370,11 @@ I file automatici hanno data e ora nel nome. I backup manuali non vengono cancel
 
 **Quando usarlo:** cambio PC, reinstallazione, o dopo aver modificato per errore le impostazioni.
 
+> Nota privacy: i **dettagli diff** della cronologia (snapshot delle righe Excel) **non** vengono inclusi nei backup.
+
 ---
 
-## 9. Aggiornamenti
+## 11. Aggiornamenti
 
 Easyfatt Sync può aggiornarsi alle nuove versioni pubblicate da Aven Labs.
 
@@ -269,9 +395,11 @@ Nella sezione **Aggiornamenti**:
 
 Gli aggiornamenti **non** cancellano le tue impostazioni.
 
+> Easyfatt Sync usa un versioning **per anno** (es. `26.x.x` = 2026). Un aggiornamento da `26.0.0` a `26.1.0` aggiunge nuove funzioni mantenendo compatibilità; un aggiornamento di MAJOR (`26 → 27`) significa nuovo anno di prodotto.
+
 ---
 
-## 10. Supporto
+## 12. Supporto
 
 Se qualcosa non funziona o hai dubbi sull’uso:
 
@@ -279,7 +407,8 @@ Se qualcosa non funziona o hai dubbi sull’uso:
 
 1. Clicca **Contatta il supporto** (o voce equivalente nel menu/footer).
 2. Compila il modulo: nome attività, email, tipo di problema, descrizione.
-3. Invia: riceverai una **email di conferma** all’indirizzo indicato.
+3. Opzionale: allega **report diagnostico** spuntando la casella e autorizzando l’invio di informazioni tecniche (senza token Google né dati Excel).
+4. Invia: riceverai una **email di conferma** all’indirizzo indicato.
 
 ### Via email
 
@@ -295,7 +424,7 @@ Indica:
 
 ---
 
-## 11. Privacy
+## 13. Privacy
 
 In sintesi:
 
@@ -306,16 +435,17 @@ In sintesi:
 | Dati nel foglio Google      | Nel **tuo Google Drive** / account Google               |
 | Impostazioni app            | Sul **tuo computer** (configurazione locale)            |
 | Token Google (collegamento) | Sul **tuo computer**, cartella dedicata Easyfatt Sync   |
+| Snapshot diff (cronologia)  | Sul **tuo computer**, **mai** inviati al supporto       |
 | Richiesta supporto          | Inviata ad Aven Labs solo se compili il modulo supporto |
 
 
 Aven Labs non riceve automaticamente l’elenco dei tuoi clienti tramite la sincronizzazione.
 
-Per i dettagli legali consulta **Privacy Policy** e **Termini** linkati nell’app al primo avvio.
+Per i dettagli legali consulta **Privacy Policy** e **Termini** linkati nell'app al primo avvio.
 
 ---
 
-## 12. Risoluzione problemi
+## 14. Risoluzione problemi
 
 ### Google non collegato
 
@@ -391,7 +521,7 @@ Easyfatt o Excel potrebbero tenere il file aperto.
 
 ---
 
-## 13. Contatti
+## 15. Contatti
 
 
 | Canale         | Dettaglio                                             |

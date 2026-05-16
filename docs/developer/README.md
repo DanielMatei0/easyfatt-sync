@@ -1,26 +1,12 @@
 # Easyfatt Sync — Documentazione tecnica sviluppatori
 
-Documentazione di riferimento per sviluppo, manutenzione, build e release dell’applicazione desktop **Easyfatt Sync** (Aven Labs).
+*Versione documentazione allineata a Easyfatt Sync **26.0.0** (ciclo 2026, stack Electron 42, backup v1.0).*
+
+Documentazione di riferimento per sviluppo, manutenzione, build e release dell'applicazione desktop **Easyfatt Sync** (Aven Labs).
 
 ---
 
-## Indice
 
-1. [Introduzione progetto](#1-introduzione-progetto)
-2. [Architettura applicazione](#2-architettura-applicazione)
-3. [Struttura progetto](#3-struttura-progetto)
-4. [Configurazione sviluppo](#4-configurazione-sviluppo)
-5. [Google OAuth setup](#5-google-oauth-setup)
-6. [Sistema sincronizzazione](#6-sistema-sincronizzazione)
-7. [Sistema aggiornamenti automatici](#7-sistema-aggiornamenti-automatici)
-8. [Sistema supporto](#8-sistema-supporto)
-9. [Backup e ripristino](#9-backup-e-ripristino)
-10. [Sicurezza](#10-sicurezza)
-11. [Workflow release](#11-workflow-release)
-12. [TODO / roadmap](#12-todo--roadmap)
-13. [Troubleshooting tecnico](#13-troubleshooting-tecnico)
-
----
 
 ## 1. Introduzione progetto
 
@@ -69,27 +55,36 @@ Il cliente finale non configura Google Cloud: usa credenziali OAuth **centralizz
 ### Diagramma logico
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    RENDERER (BrowserWindow)                  │
-│  index.html · style.css · renderer.js                        │
-│  Legge/scrive form · attività · modali · legal gate          │
-└───────────────────────────┬─────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                       RENDERER (BrowserWindow)                        │
+│  index.html · style.css                                               │
+│  renderer.js · nav-ui.js · dashboard-ui.js · profiles-ui.js           │
+│  history-ui.js · diff-detail-ui.js · onboarding-ui.js                 │
+└───────────────────────────┬──────────────────────────────────────────┘
                             │ contextBridge (preload.js)
                             │ invoke + eventi IPC
-┌───────────────────────────▼─────────────────────────────────┐
-│                      MAIN PROCESS (main.js)                  │
-│  IPC · electron-store · dialog · shell.openExternal            │
-└─┬─────────┬──────────┬──────────┬──────────┬────────────────┘
-  │         │          │          │          │
-  ▼         ▼          ▼          ▼          ▼
-scheduler  syncRunner  auth.js   backup.js  updater.js
-  │         │          │          │          support.js
-  │         ▼          │          │
-  │      sync.js       │          │
-  │    (xlsx + API)    │          │
-  ▼                    ▼          ▼
-chokidar            token.json   JSON backup
-node-cron           oauth_credentials.json
+┌───────────────────────────▼──────────────────────────────────────────┐
+│                       MAIN PROCESS (main.js)                          │
+│  IPC · electron-store · dialog · shell.openExternal · auto-updater    │
+└─┬─────────┬──────────┬──────────┬──────────┬──────────┬──────────────┘
+  │         │          │          │          │          │
+  ▼         ▼          ▼          ▼          ▼          ▼
+scheduler  syncRunner  auth.js   backup.js  updater.js  support.js
+  │         │
+  │         ├──── sync.js (xlsx + Google Sheets)
+  │         ├──── diffEngine.js  (normalizza + calcola diff)
+  │         ├──── syncSnapshots.js (snapshot Excel locali)
+  │         └──── syncHistory.js (cronologia + diff summary)
+  ▼
+chokidar (watch file)        ┌──────────────────────────┐
+node-cron (sync programmata) │  electron-store keys:    │
+                             │  - config (profili)      │
+                             │  - syncHistory           │
+                             │  - syncHistoryDiffs      │
+                             │  - profileDataSnapshots  │
+                             │  - legal*                │
+                             │  - backupLast*           │
+                             └──────────────────────────┘
 ```
 
 ### Main process
@@ -102,9 +97,15 @@ node-cron           oauth_credentials.json
 
 ### Renderer process
 
-- Carica `renderer/index.html` + `renderer.js`.
+- Carica `renderer/index.html` + più moduli JS coordinati da `renderer.js`.
 - Interagisce solo con `window.easyfattSync` (API preload).
-- Gestisce: form impostazioni, stato sync, attività recenti (max 50), tema chiaro/scuro, legal gate, supporto, backup UI, aggiornamenti.
+- Modulo `nav-ui.js`: layout a 3 colonne (sidebar · main · side panel), routing tra viste, persiste vista attiva in `localStorage`.
+- Modulo `dashboard-ui.js`: dashboard salute, ultima sync, prossima sync, contatori giornalieri.
+- Modulo `profiles-ui.js`: gestione profili sync, empty state intelligente (testo cambia da "prima sincronizzazione" a "un'altra sincronizzazione" in base a profili esistenti).
+- Modulo `history-ui.js`: cronologia eventi, filtri, mini-badge diff (`+ / ~ / −`), click-to-detail.
+- Modulo `diff-detail-ui.js`: vista *Dettaglio sincronizzazione* stile GitHub diff.
+- Modulo `onboarding-ui.js`: wizard 6-step.
+- Gestisce inoltre: form impostazioni, attività recenti (max 50), tema chiaro/scuro persistito, legal gate, supporto, backup UI, aggiornamenti.
 
 ### Preload
 
@@ -131,6 +132,9 @@ Espone un sottoinsieme sicuro di operazioni tramite `contextBridge.exposeInMainW
 | `submit-support-request`                                                  | R → M     | Supporto                          |
 | `get-legal-status` / `accept-legal`                                       | R ↔ M     | Privacy/termini                   |
 | `open-external`                                                           | R → M     | Link HTTPS nel browser di sistema |
+| `get-sync-history` / `export-history-report`                              | R ↔ M     | Cronologia eventi                 |
+| `get-history-diff`                                                        | R ↔ M     | Dettaglio diff di un evento       |
+| `clear-sync-history`                                                      | R → M     | Reset cronologia + snapshot       |
 | `log`                                                                     | M → R     | Stream log attività               |
 | `config-updated`                                                          | M → R     | Refresh UI dopo sync/restore      |
 | `update-state` / `update-progress`                                        | M → R     | Stato aggiornamenti               |
@@ -140,7 +144,10 @@ Espone un sottoinsieme sicuro di operazioni tramite `contextBridge.exposeInMainW
 
 - Istanza singleton in `main.js`: `const store = new Store()`.
 - Chiavi principali:
-  - `config` — oggetto impostazioni utente (vedi `syncState.getDefaultConfig()`).
+  - `config` — oggetto impostazioni utente (vedi `syncState.getDefaultConfig()`), include `syncProfiles[]`.
+  - `syncHistory` — array eventi sync (max **500**, ognuno con `diffSummary` inline e flag `hasDiffDetails`).
+  - `syncHistoryDiffs` — mappa `{ eventId → diffDetails }`, max **50** eventi con dettaglio, max **500 righe** per categoria, valori troncati a **500 caratteri**.
+  - `profileDataSnapshots` — mappa `{ profileId → { headers, rows[], capturedAt } }`, max **20000 righe** per snapshot.
   - `legalAccepted`, `legalAcceptedAt`, `legalVersion`.
   - `backupLastCreatedAt`, `backupLastRestoredAt`, `backupLastAutomaticAt`.
 
@@ -163,10 +170,35 @@ Ogni `restartScheduler` esegue `stopScheduler()` (chiude watcher, ferma cron, ca
 
 Pipeline:
 
-1. `sync.js` — legge Excel (async + retry), prepara matrice valori, chiama Google Sheets API.
-2. `syncRunner.js` — orchestrazione, notifiche, `recordSyncSuccess` su store.
-3. `sheetRange.js` — range dinamico colonne (non più `A:Z` fisso).
-4. `errors.js` — messaggi client-friendly.
+1. `sync.js` — legge Excel (async + retry), prepara matrice valori, chiama Google Sheets API. Restituisce anche `headers` e `normalizedRows` per il diff.
+2. `syncRunner.js` — orchestrazione: mutex `syncInProgress`, notifiche, `recordSyncSuccess`. **Post-sync**: chiama `computeDiffAndSnapshot()` che (a) recupera snapshot precedente, (b) calcola diff via `diffEngine.calculateDiff`, (c) salva il nuovo snapshot, (d) passa `diffSummary` + `diffDetails` a `recordSyncEvent`.
+3. `diffEngine.js` — `normalizeRows`, `getRowKey` (primary key configurabile / candidate `Codice`/`Email` / hash MD5 fallback), `calculateDiff` con limite `MAX_DIFF_TOTAL` per file enormi.
+4. `syncSnapshots.js` — persistenza snapshot per profilo, `pruneOrphanSnapshots` al salvataggio config, `clearAllSnapshots` al reset cronologia.
+5. `syncHistory.js` — `recordSyncEvent` con `diffSummary` inline; `syncHistoryDiffs` separati con pruning (`MAX_DIFF_EVENTS=50`, `MAX_DIFF_ROWS_DETAIL=500`).
+6. `sheetRange.js` — range dinamico colonne (non più `A:Z` fisso).
+7. `errors.js` — messaggi client-friendly.
+
+### Diff engine (nuovo in 26.0.0)
+
+```
+runSync(profile)
+  └── sync.js → { headers, normalizedRows, success, rowCount, durationMs }
+  └── computeDiffAndSnapshot(profile, headers, rows)
+        ├── previous = syncSnapshots.getSnapshot(profile.id)
+        ├── diff     = diffEngine.calculateDiff(previous, current, profile)
+        ├── syncSnapshots.setSnapshot(profile.id, { headers, rows, capturedAt })
+        └── return { diffSummary, diffDetails }
+  └── syncHistory.recordSyncEvent({ ..., diffSummary, diffDetails })
+        ├── store.syncHistory.push(event con diffSummary inline)
+        ├── if diffDetails: syncHistoryDiffs[event.id] = sanitize(diffDetails)
+        └── pruneDiffs() — mantiene ultimi 50 eventi con dettaglio
+```
+
+**Privacy**: i `diffDetails` (contengono dati clienti) non vengono mai:
+
+- inclusi nei backup di default;
+- inviati al supporto via `diagnostics.js` (deletion esplicita);
+- esposti via altri canali oltre alla modale locale `diff-detail-ui.js`.
 
 ### Google OAuth
 
@@ -213,11 +245,19 @@ easyfatt-sync-app/
 ├── main.js                 # Entry Electron, IPC, lifecycle
 ├── preload.js              # Bridge sicuro renderer ↔ main
 ├── auth.js                 # OAuth Google, token file
-├── sync.js                 # Excel → Google Sheets
-├── syncRunner.js           # Wrapper sync + mutex + notifiche
-├── syncState.js            # Default config, merge, validazione scheduler
-├── scheduler.js            # Watch, cron, backup automatico
-├── backup.js               # Backup/restore JSON
+├── sync.js                 # Excel → Google Sheets (ritorna headers + normalizedRows)
+├── syncRunner.js           # Mutex sync, notifiche, post-sync diff & snapshot
+├── syncState.js            # Profili sync, merge, migrazione legacy
+├── syncHistory.js          # Cronologia eventi (max 500) + diffSummary inline + diff details separati
+├── syncSnapshots.js        # Snapshot Excel per profilo (electron-store, pruning orfani)
+├── diffEngine.js           # Normalizzazione, row key, calculateDiff stile GitHub
+├── healthStatus.js         # Calcolo dashboard salute
+├── excelUtils.js           # Validazione/preview Excel, retry lettura
+├── columnMapping.js        # Mapping colonne per profilo
+├── diagnostics.js          # Report diagnostico supporto (sanitizzato, no diff details)
+├── appConstants.js         # Costanti prodotto / rebranding futuro
+├── scheduler.js            # Watch, cron, backup automatico, multi-profilo
+├── backup.js               # Backup/restore JSON (no diff/snapshot per privacy)
 ├── updater.js              # electron-updater
 ├── support.js              # Invio richiesta supporto
 ├── supportConstants.js     # URL API, email
@@ -227,14 +267,26 @@ easyfatt-sync-app/
 ├── errors.js               # Messaggi errore UI
 ├── sheetRange.js           # Helper range Sheets
 ├── legalConstants.js       # Versione legale, URL policy
-├── package.json            # Scripts, electron-builder, publish
-├── UPDATES.md              # Note release/updater
+├── package.json            # Scripts, electron-builder, publish (version: 26.0.0)
+├── UPDATES.md              # Workflow release operativo + secret GitHub Actions
+├── VERSIONING.md           # Strategia calendar versioning (MAJOR = anno)
+├── RELEASE_NOTES.md        # Note release 26.0.0
+├── SECURITY.md             # Policy vulnerabilità + file da non committare
+├── .github/
+│   └── workflows/
+│       └── release.yaml    # CI build Win+Mac su tag v*.*.*
 ├── assets/
 │   └── icon.png            # Icona app / build
 ├── renderer/
 │   ├── index.html
 │   ├── style.css
-│   └── renderer.js
+│   ├── renderer.js         # Entry UI, theme, version footer
+│   ├── nav-ui.js           # Sidebar, viste, header CTA, save bar conditional
+│   ├── dashboard-ui.js     # Dashboard salute
+│   ├── profiles-ui.js      # Gestione profili + empty state dinamico
+│   ├── history-ui.js       # Cronologia, filtri, click-to-detail
+│   ├── diff-detail-ui.js   # Modale Dettaglio sync (tab + GitHub diff)
+│   └── onboarding-ui.js    # Wizard 6-step
 ├── legal/
 │   ├── privacy-easyfatt-sync.md
 │   └── terms-easyfatt-sync.md
@@ -245,18 +297,23 @@ easyfatt-sync-app/
 ### File principali (ruolo)
 
 
-| File                   | Ruolo                                                |
-| ---------------------- | ---------------------------------------------------- |
-| `main.js`              | Window, IPC, collegamento moduli, `restartScheduler` |
-| `preload.js`           | API `window.easyfattSync`                            |
-| `auth.js`              | OAuth loopback, read/write token, cache client       |
-| `sync.js`              | Lettura XLSX, clear/update Sheets                    |
-| `syncRunner.js`        | Mutex sync, notifiche successo/errore                |
-| `scheduler.js`         | Automazioni temporizzate e watch file                |
-| `backup.js`            | Payload backup, restore, cleanup                     |
-| `updater.js`           | Check/download/install release GitHub                |
-| `support.js`           | Validazione form + fetch API                         |
-| `renderer/renderer.js` | Logica UI, attività, form, modali                    |
+| File                   | Ruolo                                                                  |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `main.js`              | Window, IPC, collegamento moduli, `restartScheduler`, prune snapshot   |
+| `preload.js`           | API `window.easyfattSync` (incluso `getHistoryDiff`, `clearSyncHistory`) |
+| `auth.js`              | OAuth loopback, read/write token, cache client                         |
+| `sync.js`              | Lettura XLSX, clear/update Sheets, ritorna `normalizedRows`            |
+| `syncRunner.js`        | Mutex sync, notifiche, **diff & snapshot post-sync**                   |
+| `diffEngine.js`        | **Normalizza righe, getRowKey, calculateDiff (added/modified/removed)** |
+| `syncSnapshots.js`     | **Snapshot Excel per profilo, prune orfani, clear all**                 |
+| `syncHistory.js`       | Eventi sync + `diffSummary` inline + `syncHistoryDiffs` pruned          |
+| `scheduler.js`         | Automazioni temporizzate, watch file, multi-profilo                    |
+| `backup.js`            | Payload backup, restore, cleanup (no diff/snapshot)                    |
+| `updater.js`           | Check/download/install release GitHub                                  |
+| `support.js`           | Validazione form + fetch API                                            |
+| `renderer/nav-ui.js`   | Sidebar, viste, distribuzione accordion → view                          |
+| `renderer/diff-detail-ui.js` | Modale Dettaglio sync, render GitHub diff                         |
+| `renderer/renderer.js` | Logica UI, attività, form, modali, theme                                |
 
 
 ---
@@ -499,13 +556,15 @@ Vedi anche `[UPDATES.md](../../UPDATES.md)` e [§11](#11-workflow-release).
 4. GitHub Release con asset: `.exe` / `.dmg`, `latest.yml`, `.blockmap` se presenti.
 5. App installata legge `latest.yml` e propone update.
 
-### Versioning
+### Versioning (calendar-based dal 2026)
 
-Seguire **Semantic Versioning** per comunicare breaking change agli utenti:
+Dalla `26.0.0` Easyfatt Sync adotta **calendar versioning**: MAJOR = anno (`26` = 2026, `27` = 2027…). Vedi [`VERSIONING.md`](../../VERSIONING.md).
 
-- **PATCH** — bugfix, messaggi, piccole correzioni.
-- **MINOR** — nuove funzioni compatibili (es. nuova opzione backup).
-- **MAJOR** — cambi formato backup, OAuth, o comportamento sync incompatibile.
+- **MAJOR** — anno di riferimento; non implica automaticamente breaking change ma vengono comunque dichiarate in `RELEASE_NOTES.md`.
+- **MINOR** — feature update durante l'anno (es. `26.1.0`).
+- **PATCH** — bugfix (`26.0.1`).
+
+Lo schema resta SemVer-compatibile per electron-updater: numeri MAJOR alti sono validi e ordinati correttamente.
 
 ---
 
@@ -571,7 +630,7 @@ Nome automatico: `easyfatt-sync-backup-YYYY-MM-DD-HH-mm.json`
   "backupVersion": "1.0",
   "backupType": "manual",
   "createdAt": "2026-05-16T20:00:00.000Z",
-  "appVersion": "1.0.0",
+  "appVersion": "26.0.0",
   "platform": "darwin",
   "config": { },
   "legalAccepted": true,
@@ -641,11 +700,34 @@ preload: path.join(__dirname, "preload.js"),
 ### Token e credenziali
 
 
-| Asset                | Posizione                 | Git      |
-| -------------------- | ------------------------- | -------- |
-| OAuth client secret  | `oauth_credentials.json`  | Ignorato |
-| Refresh/access token | `EasyfattSync/token.json` | Ignorato |
-| Config utente        | electron-store (userData) | Locale   |
+| Asset                | Posizione                          | Git      |
+| -------------------- | ---------------------------------- | -------- |
+| OAuth client secret  | `oauth_credentials.json`           | Ignorato |
+| Refresh/access token | `EasyfattSync/token.json`          | Ignorato |
+| Config utente        | electron-store (userData)          | Locale   |
+| Diff snapshot Excel  | electron-store `profileDataSnapshots` | Locale (mai esposti) |
+| Diff details         | electron-store `syncHistoryDiffs`  | Locale (mai esposti) |
+
+### Repository sicurezza (cose da non committare)
+
+Oltre a `oauth_credentials.json` / `token.json` / `.env`, evita di committare:
+
+- `dist/`, `*.exe`, `*.dmg`, `*.blockmap`
+- `latest.yml`, `latest-mac.yml`
+- `*.easyfatt-sync-backup.json`
+- log applicativi (`*.log`, `logs/`)
+
+Lista completa in [`.gitignore`](../../.gitignore) e [`SECURITY.md`](../../SECURITY.md).
+
+### CI secret handling
+
+Il workflow `release.yaml`:
+
+1. Scrive `oauth_credentials.json` dal secret `OAUTH_CREDENTIALS_JSON` **solo durante la build**.
+2. Esegue `rm -f oauth_credentials.json` in step `if: always()`.
+3. Non logga mai il contenuto del secret (`printf '%s'` su file, senza `echo`).
+
+Il `GITHUB_TOKEN` ha scope di repo limitato e viene revocato al termine del job.
 
 
 ### API backend
@@ -662,28 +744,80 @@ preload: path.join(__dirname, "preload.js"),
 
 ## 11. Workflow release
 
-### Checklist completa
+### GitHub Actions (release ufficiale)
 
-- Aggiornare `version` in `package.json` (es. `1.0.1`).
-- Aggiornare note di rilascio (CHANGELOG o body GitHub Release).
-- Verificare `build.publish` (owner/repo corretti).
-- Build:
-  ```bash
-  npm run dist:win    # su Windows o CI Windows
-  npm run dist:mac    # su Mac ARM
-  npm run dist:mac:intel
-  ```
-- Controllare artefatti in `dist/`:
-  - Windows: `Easyfatt-Sync-Windows.exe`, `latest.yml`, `Easyfatt-Sync-Windows.exe.blockmap`
-  - macOS: `Easyfatt-Sync-macOS-arm64.dmg`, `latest-mac.yml`, `Easyfatt-Sync-macOS-arm64.dmg.blockmap`  
-    Dettaglio nomi stabili: [release-assets.md](./release-assets.md)
-- Creare tag Git: `git tag v1.0.1 && git push origin v1.0.1`
-- Creare **GitHub Release** dal tag.
-- Caricare **tutti** gli asset generati (incluso `latest.yml`).
-- Test su macchina pulita: install → avvio → check update → sync smoke test.
-- Comunicare agli utenti (email/newsletter se previsto).
+File: [`.github/workflows/release.yaml`](../../.github/workflows/release.yaml).
 
-### Publish con token
+Trigger: **push di un tag** `v*.*.*` (oppure `workflow_dispatch` manuale per build di prova).
+
+Pipeline:
+
+1. Checkout repo (`actions/checkout@v4`).
+2. Setup Node **22** (`actions/setup-node@v4`, cache npm).
+3. `npm ci`.
+4. Crea `oauth_credentials.json` dal secret `OAUTH_CREDENTIALS_JSON`.
+5. Build per OS della matrice:
+   - `windows-latest` → `npm run dist:win` (NSIS x64).
+   - `macos-latest` → `npm run dist:mac` (DMG ARM64, `CSC_IDENTITY_AUTO_DISCOVERY=false`).
+6. Cleanup `oauth_credentials.json` (anche su failure).
+7. Upload asset alla GitHub Release del tag (`softprops/action-gh-release@v2`):
+   - `dist/*.exe`, `dist/*.dmg`, `dist/*.yml`, `dist/*.blockmap`.
+
+**Secret richiesti** (Settings → Secrets and variables → Actions):
+
+| Secret | Valore | Note |
+|---|---|---|
+| `OAUTH_CREDENTIALS_JSON` | JSON Desktop OAuth client Aven Labs | Iniettato solo durante la build, mai persistito |
+| `GITHUB_TOKEN` | (auto) | Fornito da GitHub Actions, usato per Release |
+
+### Checklist pre-tag
+
+- [ ] `package.json` → `version` aggiornata (es. `26.0.0`)
+- [ ] `RELEASE_NOTES.md` aggiornato con novità della release
+- [ ] `UPDATES.md` e `VERSIONING.md` allineati
+- [ ] `build.publish` corretto (`DanielMatei0/easyfatt-sync`)
+- [ ] `npm run check` + `npm run security:check` puliti
+- [ ] Nessun file sensibile in `git status`
+- [ ] CI ha completato una build di prova (workflow_dispatch)
+- [ ] `npm run dev` funzionante in locale
+
+### Comandi tag/release
+
+```bash
+# scelta A — manuale
+git add .
+git commit -m "release: prepare Easyfatt Sync 26.0.0"
+git push origin main
+git tag v26.0.0
+git push origin v26.0.0
+
+# scelta B — npm version (crea commit + tag in un colpo)
+npm version 26.0.0
+git push origin main --follow-tags
+```
+
+### Release manuale (fallback)
+
+Sulla macchina target:
+
+```bash
+npm install
+# oauth_credentials.json deve esistere in root
+npm run dist:win    # su Windows o CI Windows
+npm run dist:mac    # su Mac ARM
+npm run dist:mac:intel
+```
+
+Controllare artefatti in `dist/`:
+
+- Windows: `Easyfatt-Sync-Windows.exe`, `latest.yml`, `Easyfatt-Sync-Windows.exe.blockmap`
+- macOS: `Easyfatt-Sync-macOS-arm64.dmg`, `latest-mac.yml`, `Easyfatt-Sync-macOS-arm64.dmg.blockmap`
+
+Dettaglio nomi stabili: [release-assets.md](./release-assets.md).
+
+Caricare manualmente tutti gli asset sulla GitHub Release (incluso `latest*.yml`).
+
+### Publish locale con token (raro)
 
 ```bash
 export GH_TOKEN=<github_pat_with_repo_scope>
@@ -691,12 +825,13 @@ npm run dist:win
 # electron-builder può pubblicare se configurato --publish always
 ```
 
-In CI è preferibile usare GitHub Actions con secret `GH_TOKEN`.
+In CI il publish è gestito dal workflow → preferire sempre GitHub Actions.
 
 ### Compatibilità aggiornamenti
 
 - Gli utenti su versione N ricevono update solo se `latest.yml` sulla release è coerente con la piattaforma installata.
 - Non forzare downgrade: electron-updater installa versioni più recenti.
+- Lo schema `26.x.x` è SemVer-compatibile: un utente su `1.0.3` riceve correttamente l'update a `26.0.0`.
 
 ---
 
@@ -782,4 +917,4 @@ Ogni voce richiede ADR, aggiornamento `backupVersion` se cambia schema, e revisi
 
 ---
 
-*Ultimo aggiornamento documentazione: allineata a Easyfatt Sync v1.0.0 (stack Electron 42, backup v1.0).*
+*Ultimo aggiornamento documentazione: allineata a Easyfatt Sync **26.0.0** — Maggio 2026 (stack Electron 42, Node 22 in CI, backup v1.0).*

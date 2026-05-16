@@ -29,22 +29,24 @@ function showNotification({ title, body }) {
   return true;
 }
 
-function notifySyncSuccess(rows) {
+function notifySyncSuccess(rows, profileName) {
   const count = Number(rows) || 0;
   const rowLabel = count === 1 ? "riga aggiornata" : "righe aggiornate";
+  const prefix = profileName ? `${profileName}: ` : "";
 
   return showNotification({
     title: APP_TITLE,
-    body: `Sincronizzazione completata: ${count} ${rowLabel} su Google Sheets.`,
+    body: `${prefix}${count} ${rowLabel} su Google Sheets.`,
   });
 }
 
-function notifySyncError(message) {
+function notifySyncError(message, profileName) {
   const detail = message ? String(message).trim() : "Errore sconosciuto.";
+  const prefix = profileName ? `${profileName}: ` : "";
 
   return showNotification({
     title: `${APP_TITLE} — errore`,
-    body: `Sincronizzazione non riuscita. ${detail}`,
+    body: `${prefix}errore sincronizzazione. ${detail}`,
   });
 }
 

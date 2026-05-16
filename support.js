@@ -39,6 +39,14 @@ function validateSupportForm(form) {
     errors.message = `La descrizione è troppo lunga (max ${MAX_MESSAGE_LENGTH} caratteri).`;
   }
 
+  const diagnosticConsent = form?.diagnosticConsent === true;
+  const attachDiagnostic = form?.attachDiagnostic === true;
+
+  if (attachDiagnostic && !diagnosticConsent) {
+    errors.diagnosticConsent =
+      "Per allegare il report diagnostico devi autorizzare l’invio delle informazioni tecniche.";
+  }
+
   const issueType = resolveIssueTypeLabel(issueTypeRaw);
 
   return {
@@ -50,6 +58,8 @@ function validateSupportForm(form) {
       phone: String(form?.phone || "").trim(),
       issueType,
       message,
+      diagnosticConsent,
+      attachDiagnostic,
     },
   };
 }
@@ -73,7 +83,16 @@ async function submitSupportRequest(form, context) {
     googleAuthorized: !!context.googleAuthorized,
     excelPath: context.excelPath || "",
     sheetName: context.sheetName || "",
+    syncProfileCount:
+      context.syncProfileCount != null ? Number(context.syncProfileCount) : 0,
+    syncProfileNames: Array.isArray(context.syncProfileNames)
+      ? context.syncProfileNames
+      : [],
+    activeProfileId: context.activeProfileId || null,
+    activeProfileName: context.activeProfileName || null,
     createdAt: new Date().toISOString(),
+    diagnosticReport: context.diagnosticReport || null,
+    diagnosticConsent: validation.values.diagnosticConsent,
   };
 
   const controller = new AbortController();
