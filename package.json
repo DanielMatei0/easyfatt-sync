@@ -1,6 +1,6 @@
 {
   "name": "easyfatt-sync-app",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Easyfatt Sync",
   "main": "main.js",
   "scripts": {
