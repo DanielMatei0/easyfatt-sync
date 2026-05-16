@@ -1,0 +1,53 @@
+{
+  "name": "easyfatt-sync-app",
+  "version": "1.0.0",
+  "description": "Easyfatt Sync",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+  "dist:win": "electron-builder --win nsis --x64",
+  "dist:mac": "electron-builder --mac dmg --arm64",
+  "dist:mac:intel": "electron-builder --mac dmg --x64"
+  },
+  "build": {
+    "appId": "com.avenlabs.easyfattsync",
+    "productName": "Easyfatt Sync",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "DanielMatei0",
+        "repo": "easyfatt-sync"
+      }
+    ]
+  },
+  "keywords": [],
+  "author": "AvenLabs",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "electron-log": "^5.4.4",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.3",
+    "googleapis": "^171.4.0",
+    "node-cron": "^4.2.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^42.1.0",
+    "electron-builder": "^26.8.1"
+  }
+}

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Easyfatt Sync</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body data-theme="dark">
+  <div id="legalGate" class="legal-gate" hidden role="dialog" aria-modal="true" aria-labelledby="legal-gate-title">
+    <div class="legal-gate-card">
+      <h2 id="legal-gate-title" class="legal-gate-title">Privacy e condizioni</h2>
+      <p class="legal-gate-desc">
+        Per usare Easyfatt Sync devi accettare la Privacy Policy e i Termini di utilizzo.
+        I testi completi sono disponibili sui link sotto.
+      </p>
+      <p class="legal-gate-links">
+        <button type="button" class="link-btn" data-external-url="https://aven-labs.com/privacy/easyfatt-sync">Privacy Policy</button>
+        <span class="legal-gate-sep" aria-hidden="true">·</span>
+        <button type="button" class="link-btn" data-external-url="https://aven-labs.com/terms/easyfatt-sync">Termini di utilizzo</button>
+      </p>
+      <label class="check-item legal-check">
+        <input type="checkbox" id="legalAcceptCheckbox" />
+        <span class="check-box" aria-hidden="true"></span>
+        <span class="check-text">
+          <span class="check-title">Ho letto e accetto Privacy Policy e Termini di utilizzo</span>
+        </span>
+      </label>
+      <button type="button" id="legalAcceptBtn" class="btn btn-primary" disabled>Accetta e continua</button>
+    </div>
+  </div>
+
+  <div id="supportModal" class="support-modal" hidden role="dialog" aria-modal="true" aria-labelledby="support-modal-title">
+    <div class="support-modal-card">
+      <h2 id="support-modal-title" class="support-modal-title">Contatta il supporto</h2>
+      <p class="support-modal-desc">Descrivi il problema: ti risponderemo il prima possibile.</p>
+
+      <form id="supportForm" class="support-form" novalidate>
+        <div class="support-field">
+          <label class="field-label" for="supportName">Nome cliente / attività</label>
+          <input id="supportName" type="text" name="name" autocomplete="organization" required />
+          <p id="supportNameError" class="field-error" hidden></p>
+        </div>
+
+        <div class="support-field">
+          <label class="field-label" for="supportEmail">Email</label>
+          <input id="supportEmail" type="email" name="email" autocomplete="email" required />
+          <p id="supportEmailError" class="field-error" hidden></p>
+        </div>
+
+        <div class="support-field">
+          <label class="field-label" for="supportPhone">Telefono <span class="field-optional">(opzionale)</span></label>
+          <input id="supportPhone" type="tel" name="phone" autocomplete="tel" />
+        </div>
+
+        <div class="support-field">
+          <label class="field-label" for="supportIssueType">Tipo problema</label>
+          <select id="supportIssueType" name="issueType" required>
+            <option value="">Seleziona...</option>
+            <option value="google">Collegamento Google</option>
+            <option value="excel">File Excel / Easyfatt</option>
+            <option value="sync">Sincronizzazione</option>
+            <option value="updates">Aggiornamenti</option>
+            <option value="other">Altro</option>
+          </select>
+          <p id="supportIssueTypeError" class="field-error" hidden></p>
+        </div>
+
+        <div class="support-field">
+          <label class="field-label" for="supportMessage">Descrizione problema</label>
+          <textarea id="supportMessage" name="message" rows="4" required placeholder="Spiega cosa succede e quando si presenta il problema..."></textarea>
+          <p id="supportMessageError" class="field-error" hidden></p>
+        </div>
+
+        <p id="supportFeedback" class="support-feedback" hidden role="status"></p>
+
+        <div class="support-actions">
+          <button type="button" id="supportCancelBtn" class="btn btn-secondary">Annulla</button>
+          <button type="submit" id="supportSubmitBtn" class="btn btn-primary">Invia richiesta</button>
+        </div>
+      </form>
+
+      <div id="supportSuccessPanel" class="support-success-panel" hidden>
+        <p class="support-success-text">Richiesta inviata. Abbiamo inviato una conferma alla tua email.</p>
+        <button type="button" id="supportCloseBtn" class="btn btn-primary">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-shell" id="appShell">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h10M4 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <div class="brand-text">
+          <h1>Easyfatt Sync</h1>
+          <p class="subtitle">Aggiorna Google Sheets con i clienti esportati da Easyfatt.</p>
+        </div>
+      </div>
+      <button type="button" id="themeToggle" class="theme-toggle" aria-label="Cambia tema">
+        <span class="theme-toggle-icon theme-icon-dark" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 3v2m0 14v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M3 12h2m14 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 8a4 4 0 100 8 4 4 0 000-8z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+        </span>
+        <span class="theme-toggle-icon theme-icon-light" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21 14.5A7.5 7.5 0 1110.5 4a6 6 0 108.5 10.5z" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="theme-toggle-label" id="themeToggleLabel">Tema chiaro</span>
+      </button>
+    </header>
+
+    <main class="app">
+      <div class="column-main">
+        <p id="unsavedBanner" class="unsaved-banner" hidden role="status">Hai modifiche non salvate — clicca Salva impostazioni</p>
+
+        <!-- Card sincronizzazione principale (sempre visibile) -->
+        <section class="card sync-hero" aria-labelledby="sync-hero-title">
+          <h2 id="sync-hero-title" class="sync-hero-title">Sincronizza clienti</h2>
+          <p class="sync-hero-desc">Trasferisci l’elenco clienti da Easyfatt al tuo foglio Google con un clic.</p>
+
+          <button type="button" id="syncBtn" class="btn btn-primary btn-sync-hero">
+            <svg class="btn-sync-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 0113.66-5.66M20 12a8 8 0 01-13.66 5.66" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4h4v4M8 20H4v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="syncBtnLabel">Sincronizza ora</span>
+          </button>
+
+          <ul class="sync-quick-stats" aria-label="Riepilogo rapido">
+            <li>
+              <span class="stat-label">Ultima sync</span>
+              <span id="heroLastSync" class="stat-value">Mai eseguita</span>
+            </li>
+            <li>
+              <span class="stat-label">Righe sincronizzate</span>
+              <span id="heroLastSyncRows" class="stat-value">—</span>
+            </li>
+            <li>
+              <span class="stat-label">Google</span>
+              <span id="heroGoogle" class="stat-value stat-pill" data-tone="inactive">Non collegato</span>
+            </li>
+            <li>
+              <span class="stat-label">File monitorato</span>
+              <span id="heroWatch" class="stat-value stat-pill" data-tone="inactive">Non attivo</span>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Impostazioni ad accordion -->
+        <div class="accordion" id="settingsAccordion">
+          <div class="accordion-item" data-accordion-item>
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-origin" id="trigger-origin">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" stroke-width="1.75"/><path d="M14 2v6h6M8 13h8M8 17h5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Origine dati</span>
+                <span class="accordion-desc">File Excel esportato da Easyfatt</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-origin" class="accordion-panel" role="region" aria-labelledby="trigger-origin">
+              <div class="accordion-body">
+                <label class="field-label" for="excelPath">File Excel Easyfatt</label>
+                <div class="row">
+                  <input id="excelPath" type="text" placeholder="C:\AvenSync\clienti.xlsx" autocomplete="off" />
+                  <button type="button" id="browseBtn" class="btn btn-secondary">Sfoglia</button>
+                </div>
+                <p class="field-hint">Percorso completo del file .xlsx generato da Easyfatt.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" data-accordion-item>
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-destination" id="trigger-destination">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Destinazione Google</span>
+                <span class="accordion-desc">Foglio Google Sheets di destinazione</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-destination" class="accordion-panel" role="region" aria-labelledby="trigger-destination">
+              <div class="accordion-body">
+                <label class="field-label" for="spreadsheetId">ID Google Sheet</label>
+                <input id="spreadsheetId" type="text" placeholder="1AbCDef..." autocomplete="off" />
+                <p class="field-hint">Nell’URL del foglio, tra <code>/d/</code> e <code>/edit</code>.</p>
+                <label class="field-label" for="sheetName">Nome scheda</label>
+                <input id="sheetName" type="text" placeholder="Clienti" autocomplete="off" />
+                <p class="field-hint">Nome esatto del tab nel documento.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" data-accordion-item id="accordion-google">
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-google" id="trigger-google">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 11c1.66 0 3-1.34 3-3S13.66 5 12 5 9 6.34 9 8s1.34 3 3 3zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Collegamento Google</span>
+                <span class="accordion-desc">Accedi con il tuo account Google</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-google" class="accordion-panel" role="region" aria-labelledby="trigger-google">
+              <div class="accordion-body">
+                <p id="authGoogleStatus" class="auth-status" data-tone="inactive">Account Google non collegato</p>
+                <p class="field-hint auth-hint">Accedi con il tuo account Google. Non serve creare un progetto Google Cloud.</p>
+                <div class="auth-actions">
+                  <button type="button" id="authBtn" class="btn btn-secondary btn-google">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 11c1.66 0 3-1.34 3-3S13.66 5 12 5 9 6.34 9 8s1.34 3 3 3zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/></svg>
+                    Collega Google
+                  </button>
+                  <button type="button" id="logoutBtn" class="btn btn-danger" hidden>Disconnetti Google</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" data-accordion-item>
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-privacy" id="trigger-privacy">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 11c1.66 0 3-1.34 3-3S13.66 5 12 5 9 6.34 9 8s1.34 3 3 3zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" stroke="currentColor" stroke-width="1.75"/><path d="M4 19h16" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Privacy e dati</span>
+                <span class="accordion-desc">Come vengono usati i tuoi dati</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-privacy" class="accordion-panel" role="region" aria-labelledby="trigger-privacy">
+              <div class="accordion-body">
+                <p class="field-hint privacy-summary">
+                  I dati vengono letti dal file Excel locale e scritti nel Google Sheet autorizzato.
+                  Il token Google è salvato localmente sul dispositivo.
+                </p>
+                <div class="legal-link-row">
+                  <button type="button" class="link-btn" data-external-url="https://aven-labs.com/privacy/easyfatt-sync">Privacy Policy</button>
+                  <button type="button" class="link-btn" data-external-url="https://aven-labs.com/terms/easyfatt-sync">Termini di utilizzo</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" data-accordion-item>
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-updates" id="trigger-updates">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v3m0 12v3M4.2 4.2l2.1 2.1m11.4 11.4l2.1 2.1M3 12h3m12 0h3M4.2 19.8l2.1-2.1m11.4-11.4l2.1-2.1" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Aggiornamenti</span>
+                <span class="accordion-desc">Versione app e download aggiornamenti</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-updates" class="accordion-panel" role="region" aria-labelledby="trigger-updates">
+              <div class="accordion-body">
+                <p class="field-hint">
+                  Versione attuale: <strong id="settingsAppVersion">—</strong>
+                </p>
+                <p id="updateStatusText" class="update-status-text" role="status" data-state="idle">Pronto</p>
+                <div class="update-actions">
+                  <button type="button" id="checkUpdatesBtn" class="btn btn-secondary">Controlla aggiornamenti</button>
+                  <button type="button" id="downloadUpdateBtn" class="btn btn-primary btn-update-highlight" hidden>Scarica aggiornamento</button>
+                  <button type="button" id="installUpdateBtn" class="btn btn-primary btn-update-highlight" hidden>Installa e riavvia</button>
+                </div>
+                <div id="updateProgressWrap" class="update-progress-wrap" hidden>
+                  <div class="update-progress-bar" aria-hidden="true">
+                    <span id="updateProgressFill" class="update-progress-fill" style="width: 0%"></span>
+                  </div>
+                  <span id="updateProgressLabel" class="field-hint">0%</span>
+                </div>
+                <p class="field-hint update-hint">Gli aggiornamenti richiedono il tuo consenso prima di scaricare e installare.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" data-accordion-item>
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-automation" id="trigger-automation">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Automazioni</span>
+                <span class="accordion-desc">Sync automatica e avvio con Windows</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-automation" class="accordion-panel" role="region" aria-labelledby="trigger-automation">
+              <div class="accordion-body">
+                <div class="checks">
+                  <label class="check-item">
+                    <input type="checkbox" id="watchEnabled" />
+                    <span class="check-box" aria-hidden="true"></span>
+                    <span class="check-text">
+                      <span class="check-title">Sync quando cambia il file</span>
+                      <span class="check-desc">Aggiorna al salvataggio del file Excel</span>
+                    </span>
+                  </label>
+                  <label class="check-item">
+                    <input type="checkbox" id="scheduleEnabled" />
+                    <span class="check-box" aria-hidden="true"></span>
+                    <span class="check-text">
+                      <span class="check-title">Sync programmata</span>
+                      <span class="check-desc">Esegue la sync negli orari impostati</span>
+                    </span>
+                  </label>
+                  <label class="check-item">
+                    <input type="checkbox" id="openAtLogin" />
+                    <span class="check-box" aria-hidden="true"></span>
+                    <span class="check-text">
+                      <span class="check-title">Avvio con Windows</span>
+                      <span class="check-desc">Apre l’app all’accensione del PC</span>
+                    </span>
+                  </label>
+                </div>
+                <div id="scheduleFields" class="nested-fields">
+                  <label class="field-label" for="syncTimes">Orari sincronizzazione</label>
+                  <textarea id="syncTimes" placeholder="09:00&#10;13:00&#10;18:00"></textarea>
+                  <p class="field-hint">Un orario per riga, formato HH:MM.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" data-accordion-item>
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-notifications" id="trigger-notifications">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Notifiche</span>
+                <span class="accordion-desc">Avvisi desktop e promemoria</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-notifications" class="accordion-panel" role="region" aria-labelledby="trigger-notifications">
+              <div class="accordion-body">
+                <div class="checks">
+                  <label class="check-item">
+                    <input type="checkbox" id="notificationsEnabled" checked />
+                    <span class="check-box" aria-hidden="true"></span>
+                    <span class="check-text">
+                      <span class="check-title">Notifiche desktop</span>
+                      <span class="check-desc">Avviso a sync completata o in errore</span>
+                    </span>
+                  </label>
+                  <label class="check-item">
+                    <input type="checkbox" id="missingSyncReminderEnabled" checked />
+                    <span class="check-box" aria-hidden="true"></span>
+                    <span class="check-text">
+                      <span class="check-title">Promemoria se nessuna sync oggi</span>
+                      <span class="check-desc">Ti avvisa negli orari scelti</span>
+                    </span>
+                  </label>
+                </div>
+                <div id="reminderFields" class="nested-fields">
+                  <label class="field-label" for="reminderTimes">Orari promemoria</label>
+                  <textarea id="reminderTimes" placeholder="12:00&#10;19:00"></textarea>
+                  <p class="field-hint">Riceverai un avviso a questi orari solo se oggi non è ancora stata eseguita nessuna sincronizzazione. Un orario per riga, HH:MM.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <button type="button" id="saveBtn" class="btn btn-secondary btn-save">Salva impostazioni</button>
+        </div>
+      </div>
+
+      <aside class="column-side card card-status" aria-labelledby="status-heading">
+        <h2 id="status-heading" class="side-title">Stato &amp; attività</h2>
+
+        <div class="status-hero">
+          <span class="status-label">Sincronizzazione</span>
+          <div id="status" class="status-pill" data-state="idle" role="status">Pronto</div>
+        </div>
+
+        <div id="syncProgressWrap" class="sync-progress-wrap" hidden>
+          <p id="syncProgressLabel" class="sync-progress-label">Sincronizzazione in corso...</p>
+          <div class="sync-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="syncProgressFill" class="sync-progress-fill" style="width: 0%"></span>
+          </div>
+        </div>
+
+        <div class="badge-row" aria-label="Indicatori">
+          <span id="badgeGoogle" class="badge" data-tone="inactive">Google</span>
+          <span id="badgeWatch" class="badge" data-tone="inactive">Watch</span>
+          <span id="badgeSchedule" class="badge" data-tone="inactive">Programmata</span>
+        </div>
+        <p class="side-last-sync">
+          <span class="side-meta-label">Ultima sync</span>
+          <span id="badgeLastSync" class="side-meta-value">Mai eseguita</span>
+        </p>
+
+        <section class="activity-block" aria-labelledby="activity-heading">
+          <div class="activity-header">
+            <h3 id="activity-heading" class="activity-title">Attività recenti</h3>
+            <button type="button" id="clearActivityBtn" class="btn-text">Pulisci attività</button>
+          </div>
+          <div id="activityList" class="activity-list" aria-live="polite">
+            <p id="activityEmpty" class="activity-empty">
+              Nessuna attività recente. Avvia una sincronizzazione per vedere gli aggiornamenti.
+            </p>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="app-footer" aria-label="Informazioni legali">
+      <span class="app-footer-copy">© Aven Labs</span>
+      <span class="app-footer-sep" aria-hidden="true">·</span>
+      <button type="button" class="link-btn" data-external-url="https://aven-labs.com/privacy/easyfatt-sync">Privacy Policy</button>
+      <span class="app-footer-sep" aria-hidden="true">·</span>
+      <button type="button" class="link-btn" data-external-url="https://aven-labs.com/terms/easyfatt-sync">Termini di utilizzo</button>
+      <span class="app-footer-sep" aria-hidden="true">·</span>
+      <button type="button" id="openSupportBtn" class="link-btn">Contatta il supporto</button>
+      <span class="app-footer-sep" aria-hidden="true">·</span>
+      <span class="app-footer-version">v<span id="footerAppVersion">—</span></span>
+    </footer>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

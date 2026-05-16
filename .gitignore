@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# Credenziali e token locali (non committare)
+oauth_credentials.json
+token.json
+.env
+.env.local
+
+# Backend example env
+backend-examples/**/.env.local
+!backend-examples/**/.env.example
