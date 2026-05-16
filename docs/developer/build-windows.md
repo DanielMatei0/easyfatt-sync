@@ -30,18 +30,23 @@ Risultato tipico nella cartella `dist/`:
 
 | File | Uso |
 |------|-----|
-| `Easyfatt Sync Setup X.Y.Z.exe` | Installer per i clienti (setup guidato NSIS) |
-| `latest.yml` | Metadati per **electron-updater** (aggiornamenti automatici) |
-| `Easyfatt Sync Setup X.Y.Z.exe.blockmap` | Delta update |
+| `Easyfatt-Sync-Windows.exe` | Installer per i clienti (setup guidato NSIS) — **nome stabile** |
+| `latest.yml` | Metadati per **electron-updater** (non per download manuale) |
+| `Easyfatt-Sync-Windows.exe.blockmap` | Delta update (solo auto-update) |
 | Cartella `win-unpacked/` | App “portable” non installata (utile per debug) |
 
-Esempio con `version: "1.0.0"` in `package.json`:
+Output in `dist/`:
 
 ```text
-dist/Easyfatt Sync Setup 1.0.0.exe
+dist/Easyfatt-Sync-Windows.exe
 dist/latest.yml
-dist/Easyfatt Sync Setup 1.0.0.exe.blockmap
+dist/Easyfatt-Sync-Windows.exe.blockmap
 ```
+
+Link sito (ultima release GitHub):  
+`https://github.com/DanielMatei0/easyfatt-sync/releases/latest/download/Easyfatt-Sync-Windows.exe`
+
+Vedi anche [release-assets.md](./release-assets.md).
 
 - **Architettura:** solo **64 bit** (`x64`).
 - **Formato installer:** **NSIS** con wizard (non one-click): scelta cartella, collegamento Desktop, menu Start, icona `assets/icon.ico`.
@@ -123,7 +128,7 @@ git status
 
 In `package.json`:
 
-- **`version`** — numero versione dell’installer (es. `1.0.1` → file `Easyfatt Sync Setup 1.0.1.exe`).
+- **`version`** — numero versione in app e auto-update (il file installer resta `Easyfatt-Sync-Windows.exe`).
 - **`build.productName`** — nome visibile: `Easyfatt Sync`.
 - **`build.win.icon`** — `assets/icon.ico` (richiesto per NSIS; generato da PNG).
 
@@ -190,7 +195,7 @@ easyfatt-sync-app/dist/
 
 ### File da distribuire al cliente
 
-- **`Easyfatt Sync Setup <versione>.exe`** — da caricare sul sito o inviare al cliente.
+- **`Easyfatt-Sync-Windows.exe`** — da caricare su GitHub Release e linkare dal sito Aven Labs.
 
 ### File da allegare alla GitHub Release (aggiornamenti automatici)
 
@@ -210,7 +215,7 @@ Senza `latest.yml` sulla release, l’app installata non rileverà correttamente
 
 Checklist consigliata su un PC Windows pulito (o VM):
 
-1. Esegui il file `Easyfatt Sync Setup X.Y.Z.exe`.
+1. Esegui `Easyfatt-Sync-Windows.exe`.
 2. Completa il wizard NSIS: scegli cartella, conferma collegamento **Desktop** e **menu Start** (entrambi abilitati in `package.json` → `build.nsis`).
 3. Avvia **Easyfatt Sync** dal menu Start.
 4. Accetta **Privacy e Termini** al primo avvio.
@@ -234,9 +239,9 @@ Per distribuire aggiornamenti via **electron-updater** (GitHub Releases):
 3. Crea tag Git `v1.0.1` e push: `git tag v1.0.1 && git push origin v1.0.1`.
 4. Crea una **GitHub Release** sul repo `DanielMatei0/easyfatt-sync` (config in `package.json` → `build.publish`).
 5. Carica **obbligatoriamente** da `dist/`:
-   - `Easyfatt Sync Setup 1.0.1.exe`
-   - `latest.yml`
-   - `Easyfatt Sync Setup 1.0.1.exe.blockmap`
+   - `Easyfatt-Sync-Windows.exe` (download clienti)
+   - `latest.yml` (solo auto-update)
+   - `Easyfatt-Sync-Windows.exe.blockmap` (solo auto-update)
 
 Dettagli: [`UPDATES.md`](../../UPDATES.md) e [Workflow release](./README.md#11-workflow-release).
 
@@ -337,7 +342,7 @@ cd easyfatt-sync-app
 npm install
 # Assicurati che oauth_credentials.json sia nella root
 npm run dist:win
-# Installer in: dist\Easyfatt Sync Setup X.Y.Z.exe
+# Installer in: dist\Easyfatt-Sync-Windows.exe
 ```
 
 ---

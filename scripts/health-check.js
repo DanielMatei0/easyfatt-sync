@@ -108,6 +108,12 @@ function checkPackageJson(pkg) {
     pass("build.win.icon OK");
   }
 
+  if (build.win?.artifactName !== "Easyfatt-Sync-Windows.${ext}") {
+    fail(`build.win.artifactName inatteso: ${build.win?.artifactName}`);
+  } else {
+    pass("build.win.artifactName stabile OK");
+  }
+
   const nsis = build.nsis;
   if (!nsis || nsis.oneClick !== false) {
     fail("build.nsis.oneClick deve essere false");
@@ -119,6 +125,12 @@ function checkPackageJson(pkg) {
     fail(`build.mac.icon atteso assets/icon.icns, trovato: ${build.mac?.icon}`);
   } else {
     pass("build.mac.icon OK");
+  }
+
+  if (build.mac?.artifactName !== "Easyfatt-Sync-macOS-${arch}.${ext}") {
+    fail(`build.mac.artifactName inatteso: ${build.mac?.artifactName}`);
+  } else {
+    pass("build.mac.artifactName stabile OK");
   }
 
   if (build.mac?.hardenedRuntime !== false) {
@@ -213,17 +225,25 @@ function checkOAuthForBuild() {
   }
 }
 
-function checkDistArtifacts(pkg) {
+function checkDistArtifacts() {
   if (!fileExists("dist")) return;
 
-  const version = pkg?.version || "0.0.0";
-  const macDmg = `dist/Easyfatt Sync-${version}-arm64.dmg`;
-  const macYml = "dist/latest-mac.yml";
+  const stable = [
+    "dist/Easyfatt-Sync-Windows.exe",
+    "dist/Easyfatt-Sync-macOS-arm64.dmg",
+    "dist/Easyfatt-Sync-macOS-x64.dmg",
+    "dist/latest.yml",
+    "dist/latest-mac.yml",
+  ];
 
-  if (fileExists(macDmg)) pass(`Artefatto Mac trovato: ${path.basename(macDmg)}`);
-  else warn(`Nessun DMG arm64 per v${version} — esegui npm run dist:mac`);
-
-  if (fileExists(macYml)) pass("latest-mac.yml presente");
+  const found = stable.filter(fileExists);
+  if (found.length) {
+    found.forEach((f) => pass(`Artefatto: ${path.basename(f)}`));
+  } else {
+    warn(
+      "Nessun artefatto stabile in dist/ — esegui npm run dist:mac o dist:win"
+    );
+  }
 }
 
 function checkPlatformNotes() {
@@ -300,7 +320,7 @@ function main() {
 
   section("OAuth e build");
   checkOAuthForBuild();
-  checkDistArtifacts(pkg);
+  checkDistArtifacts();
 
   section("Piattaforma e Git");
   checkPlatformNotes();

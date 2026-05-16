@@ -30,9 +30,12 @@ In `dist/` (es. `version: "1.0.0"`):
 
 | File | Uso |
 |------|-----|
-| `Easyfatt Sync-1.0.0-arm64.dmg` | Installer per test / beta |
-| `latest-mac.yml` | Metadati **electron-updater** (macOS) |
-| `Easyfatt Sync-1.0.0-arm64.dmg.blockmap` | Delta update |
+| `Easyfatt-Sync-macOS-arm64.dmg` | Installer clienti (Apple Silicon) — **nome stabile** |
+| `latest-mac.yml` | Metadati **electron-updater** (non download manuale) |
+| `Easyfatt-Sync-macOS-arm64.dmg.blockmap` | Delta update (solo auto-update) |
+
+Link sito (ultima release):  
+`https://github.com/DanielMatei0/easyfatt-sync/releases/latest/download/Easyfatt-Sync-macOS-arm64.dmg`
 
 ### Mac Intel
 
@@ -40,9 +43,9 @@ In `dist/` (es. `version: "1.0.0"`):
 npm run dist:mac:intel
 ```
 
-Output tipico: `Easyfatt Sync-1.0.0.dmg` (arch x64) + `latest-mac.yml` + `.blockmap`.
+Output: `Easyfatt-Sync-macOS-x64.dmg` + `latest-mac.yml` + `Easyfatt-Sync-macOS-x64.dmg.blockmap`.
 
-> I nomi esatti dipendono da `productName` e `version` in `package.json`; controlla sempre la cartella `dist/` dopo la build.
+Vedi [release-assets.md](./release-assets.md).
 
 ---
 
@@ -117,8 +120,8 @@ Per ogni release che supporta **Windows e macOS**, allega **tutti** gli asset ri
 
 | Piattaforma | File |
 |-------------|------|
-| Windows | `Easyfatt Sync Setup X.Y.Z.exe`, `latest.yml`, `.exe.blockmap` |
-| macOS | `Easyfatt Sync-X.Y.Z-arm64.dmg` (o x64), `latest-mac.yml`, `.dmg.blockmap` |
+| Windows | `Easyfatt-Sync-Windows.exe`, `latest.yml`, `Easyfatt-Sync-Windows.exe.blockmap` |
+| macOS | `Easyfatt-Sync-macOS-arm64.dmg` (e/o `x64`), `latest-mac.yml`, `.blockmap` corrispondenti |
 
 Tag consigliato: `vX.Y.Z` (es. `v1.0.1`).
 

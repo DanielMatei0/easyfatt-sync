@@ -45,11 +45,14 @@ npm install
 npm run dist:win
 ```
 
-Output in `dist/` (es. versione `1.0.0`):
+Output in `dist/` (nomi **stabili**, senza versione nel filename):
 
-- `Easyfatt Sync Setup 1.0.0.exe` — setup guidato (scelta cartella, Desktop, menu Start)
-- `latest.yml` — aggiornamenti automatici (electron-updater)
-- `Easyfatt Sync Setup 1.0.0.exe.blockmap`
+- `Easyfatt-Sync-Windows.exe` — setup guidato (scelta cartella, Desktop, menu Start)
+- `latest.yml` — aggiornamenti automatici (solo electron-updater)
+- `Easyfatt-Sync-Windows.exe.blockmap`
+
+Link diretto GitHub (ultima release):  
+`https://github.com/DanielMatei0/easyfatt-sync/releases/latest/download/Easyfatt-Sync-Windows.exe`
 
 Guida completa: [`docs/developer/build-windows.md`](docs/developer/build-windows.md).
 
@@ -63,11 +66,14 @@ npm run icons:mac    # se manca assets/icon.icns
 npm run dist:mac     # ARM64 — oppure dist:mac:intel per x64
 ```
 
-Output in `dist/` (es. versione `1.0.0`):
+Output in `dist/`:
 
-- `Easyfatt Sync-1.0.0-arm64.dmg`
-- `latest-mac.yml`
-- `Easyfatt Sync-1.0.0-arm64.dmg.blockmap`
+- `Easyfatt-Sync-macOS-arm64.dmg` (Apple Silicon) o `Easyfatt-Sync-macOS-x64.dmg` (Intel)
+- `latest-mac.yml` — aggiornamenti automatici (solo electron-updater)
+- `Easyfatt-Sync-macOS-arm64.dmg.blockmap`
+
+Link diretto GitHub (ARM64):  
+`https://github.com/DanielMatei0/easyfatt-sync/releases/latest/download/Easyfatt-Sync-macOS-arm64.dmg`
 
 Guida: [`docs/developer/build-macos.md`](docs/developer/build-macos.md).
 
@@ -86,9 +92,12 @@ Guida: [`docs/developer/build-macos.md`](docs/developer/build-macos.md).
 1. Incrementa `version` in `package.json`.
 2. `npm run dist:win` su Windows; `npm run dist:mac` (e/o `dist:mac:intel`) su Mac.
 3. Crea tag `vX.X.X` e una **GitHub Release** su `DanielMatei0/easyfatt-sync`.
-4. Allega da `dist/`:
-   - Windows: `.exe`, `latest.yml`, `.exe.blockmap`
-   - macOS: `.dmg`, `latest-mac.yml`, `.dmg.blockmap`
+4. Allega da `dist/` (nomi fissi per ogni release):
+   - Windows: `Easyfatt-Sync-Windows.exe`, `latest.yml`, `Easyfatt-Sync-Windows.exe.blockmap`
+   - macOS: `Easyfatt-Sync-macOS-arm64.dmg`, `latest-mac.yml`, `Easyfatt-Sync-macOS-arm64.dmg.blockmap`  
+     (e/o `Easyfatt-Sync-macOS-x64.dmg` + relativo `.blockmap` se pubblichi Intel)
+
+> Il **cliente** scarica solo `.exe` / `.dmg`. `latest.yml` e `.blockmap` servono solo agli aggiornamenti automatici.
 
 Dettagli: [`UPDATES.md`](UPDATES.md) e [`docs/developer/README.md`](docs/developer/README.md#11-workflow-release).
 

@@ -674,8 +674,9 @@ preload: path.join(__dirname, "preload.js"),
   npm run dist:mac:intel
   ```
 - Controllare artefatti in `dist/`:
-  - Windows: `Easyfatt Sync Setup X.Y.Z.exe`, `latest.yml`, `.exe.blockmap`
-  - macOS: `Easyfatt Sync-X.Y.Z-arm64.dmg`, `latest-mac.yml`, `.dmg.blockmap`
+  - Windows: `Easyfatt-Sync-Windows.exe`, `latest.yml`, `Easyfatt-Sync-Windows.exe.blockmap`
+  - macOS: `Easyfatt-Sync-macOS-arm64.dmg`, `latest-mac.yml`, `Easyfatt-Sync-macOS-arm64.dmg.blockmap`  
+    Dettaglio nomi stabili: [release-assets.md](./release-assets.md)
 - Creare tag Git: `git tag v1.0.1 && git push origin v1.0.1`
 - Creare **GitHub Release** dal tag.
 - Caricare **tutti** gli asset generati (incluso `latest.yml`).

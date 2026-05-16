@@ -1,6 +1,6 @@
 {
   "name": "easyfatt-sync-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Easyfatt Sync",
   "main": "main.js",
   "scripts": {
@@ -42,7 +42,8 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "artifactName": "Easyfatt-Sync-Windows.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -64,7 +65,8 @@
       "category": "public.app-category.business",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "identity": null
+      "identity": null,
+      "artifactName": "Easyfatt-Sync-macOS-${arch}.${ext}"
     },
     "dmg": {
       "title": "Easyfatt Sync"

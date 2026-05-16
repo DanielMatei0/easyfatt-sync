@@ -16,9 +16,12 @@
    ```
    Guide: [Windows](docs/developer/build-windows.md) · [macOS](docs/developer/build-macos.md).
 3. Creare una **GitHub Release** con tag uguale alla versione (es. `v1.0.1`).
-4. Allegare alla release i file generati in `dist/`, in particolare:
-   - **Windows:** installer NSIS (`.exe`), `latest.yml`, `.exe.blockmap`
-   - **macOS:** `.dmg`, `latest-mac.yml`, `.dmg.blockmap`
+4. Allegare alla release i file generati in `dist/` (nomi **stabili** — vedi [release-assets.md](docs/developer/release-assets.md)):
+   - **Windows:** `Easyfatt-Sync-Windows.exe`, `latest.yml`, `Easyfatt-Sync-Windows.exe.blockmap`
+   - **macOS:** `Easyfatt-Sync-macOS-arm64.dmg`, `latest-mac.yml`, `Easyfatt-Sync-macOS-arm64.dmg.blockmap`  
+     (opz. Intel: `Easyfatt-Sync-macOS-x64.dmg` + `.blockmap`)
+
+   Il cliente scarica solo `.exe` / `.dmg`. `latest*.yml` e `.blockmap` servono solo a electron-updater.
 5. L’app installata controllerà `latest.yml` sul repository configurato e proporrà l’aggiornamento all’utente.
 
 ## Comportamento in App
