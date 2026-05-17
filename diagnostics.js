@@ -67,8 +67,19 @@ function buildDiagnosticReport({
       delete copy.hasDiffDetails;
       return copy;
     }),
+    marketing: (() => {
+      const m = store.get("marketingConfig");
+      if (!m || typeof m !== "object") return { enabled: false };
+      return {
+        enabled: !!m.enabled,
+        profilesCount: Array.isArray(m.marketingProfiles) ? m.marketingProfiles.length : 0,
+        automationsCount: Array.isArray(m.automations) ? m.automations.length : 0,
+        templatesCount: Array.isArray(m.templates) ? m.templates.length : 0,
+        sendHistoryCount: Array.isArray(m.sendHistory) ? m.sendHistory.length : 0,
+      };
+    })(),
     note:
-      "Nessun token Google, nessun contenuto Excel e nessun dettaglio diff per riga incluso.",
+      "Nessun token Google, nessun contenuto Excel, nessun dettaglio diff e nessun dato destinatario marketing incluso.",
   };
 }
 

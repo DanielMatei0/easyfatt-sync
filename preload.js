@@ -36,11 +36,37 @@ contextBridge.exposeInMainWorld("easyfattSync", {
   exportSyncHistory: (filters) => ipcRenderer.invoke("export-sync-history", filters),
   previewExcel: (excelPath) => ipcRenderer.invoke("preview-excel", excelPath),
   buildDiagnosticReport: () => ipcRenderer.invoke("build-diagnostic-report"),
+  getMarketingConfig: () => ipcRenderer.invoke("get-marketing-config"),
+  saveMarketingConfig: (config) => ipcRenderer.invoke("save-marketing-config", config),
+  getMarketingStats: () => ipcRenderer.invoke("get-marketing-stats"),
+  previewMarketingExcel: (payload) => ipcRenderer.invoke("preview-marketing-excel", payload),
+  getAutomationRecipients: (automationId) =>
+    ipcRenderer.invoke("get-automation-recipients", automationId),
+  previewMarketingAutomationDraft: (payload) =>
+    ipcRenderer.invoke("preview-marketing-automation-draft", payload),
+  simulateMarketingAutomationDraft: (payload) =>
+    ipcRenderer.invoke("simulate-marketing-automation-draft", payload),
+  simulateMarketingAutomation: (automationId) =>
+    ipcRenderer.invoke("simulate-marketing-automation", automationId),
+  simulateMarketingTestEmail: (payload) =>
+    ipcRenderer.invoke("simulate-marketing-test-email", payload),
+  clearMarketingHistory: () => ipcRenderer.invoke("clear-marketing-history"),
+  sendMarketingBatch: (payload) => ipcRenderer.invoke("send-marketing-batch", payload),
+  sendMarketingAutomation: (payload) => ipcRenderer.invoke("send-marketing-automation", payload),
+  dryRunMarketingAutomation: (automationId) =>
+    ipcRenderer.invoke("dry-run-marketing-automation", automationId),
+  pickMarketingLogo: () => ipcRenderer.invoke("pick-marketing-logo"),
+  getMarketingLogoDataUrl: (logoPath) => ipcRenderer.invoke("get-marketing-logo-data-url", logoPath),
+  renderMarketingEmailPreview: (payload) =>
+    ipcRenderer.invoke("render-marketing-email-preview", payload),
+  compileMarketingTemplate: (payload) => ipcRenderer.invoke("compile-marketing-template", payload),
   onLog: (callback) => ipcRenderer.on("log", (_, message) => callback(message)),
   onConfigUpdated: (callback) =>
     ipcRenderer.on("config-updated", (_, config) => callback(config)),
   onHistoryUpdated: (callback) =>
     ipcRenderer.on("history-updated", (_, history) => callback(history)),
+  onMarketingUpdated: (callback) =>
+    ipcRenderer.on("marketing-updated", (_, config) => callback(config)),
   onUpdateStatus: (callback) => onUpdateEvent("update-status", callback),
   onUpdateProgress: (callback) => onUpdateEvent("update-progress", callback),
   onUpdateState: (callback) => onUpdateEvent("update-state", callback),

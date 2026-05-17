@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { getDefaultConfig, ensureConfigMigrated } = require("./syncState");
+const { getMarketingConfig, normalizeMarketingConfig } = require("./marketingConfig");
 const {
   readGoogleToken,
   writeGoogleToken,
@@ -77,7 +78,14 @@ function collectBackupPayload(store, app, options = {}) {
     legalVersion: store.get("legalVersion") || null,
     googleTokenIncluded,
     googleToken,
+    marketingConfig: sanitizeMarketingForBackup(getMarketingConfig(store)),
   };
+}
+
+function sanitizeMarketingForBackup(marketing) {
+  const cfg = normalizeMarketingConfig(marketing);
+  const { sendHistory, ...rest } = cfg;
+  return { ...rest, sendHistoryCount: sendHistory.length };
 }
 
 function validateBackup(data) {
@@ -333,6 +341,16 @@ function restoreBackup(store, filePath, log = () => {}) {
       } catch {
         /* ignore: token file may be missing or unreadable */
       }
+    }
+
+    if (backup.marketingConfig) {
+      const { setMarketingConfig, getMarketingConfig } = require("./marketingConfig");
+      const currentMarketing = getMarketingConfig(store);
+      setMarketingConfig(store, {
+        ...normalizeMarketingConfig(backup.marketingConfig),
+        sendHistory: currentMarketing.sendHistory,
+      });
+      log("Configurazione marketing ripristinata (storico invii locale conservato).");
     }
 
     const now = new Date().toISOString();

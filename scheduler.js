@@ -16,6 +16,9 @@ const {
   getEnabledProfiles,
 } = require("./syncState");
 const { createAutomaticBackup, isBackupInProgress } = require("./backup");
+const { getMarketingConfig, isAutomationRunnable } = require("./marketingConfig");
+const { simulateAutomationRun, executeAutomationSend } = require("./marketingEngine");
+const { getDefaultConfig } = require("./syncState");
 
 const FILE_WATCH_DEBOUNCE_MS = 5000;
 
@@ -301,6 +304,83 @@ function startScheduler(config, log = () => {}, store, onConfigUpdated, app) {
       "Backup automatico attivo ma manca la cartella destinazione. Impostala in Backup e ripristino."
     );
   }
+
+  scheduleMarketingDailyJobs(store, log);
+}
+
+function hasMarketingDailySchedules(store) {
+  const marketing = getMarketingConfig(store);
+  if (!marketing.enabled) return false;
+  return marketing.automations.some(
+    (a) => !a.archived && a.schedule?.mode === "daily"
+  );
+}
+
+function scheduleMarketingDailyJobs(store, log) {
+  const marketing = getMarketingConfig(store);
+  if (!marketing.enabled) return;
+
+  const timeGroups = new Map();
+  marketing.automations.forEach((automation) => {
+    if (!isAutomationRunnable(automation) || automation.schedule?.mode !== "daily") {
+      return;
+    }
+    const time = String(automation.schedule?.time || "09:00").trim();
+    if (!isValidTimeHHMM(time)) {
+      log(`[Marketing] Orario non valido ignorato per «${automation.name}»: ${time}`);
+      return;
+    }
+    if (!timeGroups.has(time)) timeGroups.set(time, []);
+    timeGroups.get(time).push(automation.id);
+  });
+
+  timeGroups.forEach((automationIds, time) => {
+    const scheduled = scheduleCron(
+      time,
+      async () => {
+        if (isSyncInProgress()) {
+          log("[Marketing] Esecuzione programmata rimandata: sincronizzazione in corso.");
+          return;
+        }
+
+        const appConfig = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+        const latest = getMarketingConfig(store);
+        if (!latest.enabled) return;
+
+        for (const automationId of automationIds) {
+          const automation = latest.automations.find((a) => a.id === automationId);
+          if (!automation || !isAutomationRunnable(automation)) continue;
+
+          try {
+            log(
+              `[Marketing] Esecuzione programmata ore ${time}: ${automation.name || automationId}`
+            );
+            const marketingCfg = getMarketingConfig(store);
+            if (marketingCfg.realSendEnabled) {
+              const pkg = require("./package.json");
+              await executeAutomationSend(store, appConfig, automationId, {
+                dryRun: false,
+                consentConfirmed: true,
+                appVersion: pkg.version || "",
+              });
+            } else {
+              await simulateAutomationRun(store, appConfig, automationId);
+            }
+          } catch (error) {
+            log(`[Marketing] Errore su «${automation.name || automationId}»: ${error.message}`);
+          }
+        }
+      },
+      log,
+      `marketing ${time}`
+    );
+    if (scheduled) {
+      const count = automationIds.length;
+      log(
+        `[Marketing] Automazioni giornaliere attive alle ${time} (${count} automazione${count === 1 ? "" : "i"}).`
+      );
+    }
+  });
 }
 
 function stopScheduler() {
@@ -308,7 +388,7 @@ function stopScheduler() {
   stopAllCronJobs();
 }
 
-function shouldStartScheduler(config) {
+function shouldStartScheduler(config, storeRef) {
   if (!config) return false;
   const prepared = ensureConfigMigrated(config);
 
@@ -322,7 +402,8 @@ function shouldStartScheduler(config) {
       Array.isArray(prepared.reminderTimes) &&
       prepared.reminderTimes.length > 0) ||
     shouldStartAutomaticBackup(prepared) ||
-    !!prepared.automaticBackupEnabled
+    !!prepared.automaticBackupEnabled ||
+    (storeRef && hasMarketingDailySchedules(storeRef))
   );
 }
 

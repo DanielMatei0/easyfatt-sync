@@ -20,11 +20,12 @@ Non serve essere esperti di informatica: segui i passaggi in ordine la prima vol
 8. [Cronologia e dettaglio sync](#8-cronologia-e-dettaglio-sync)
 9. [Notifiche](#9-notifiche)
 10. [Backup](#10-backup)
-11. [Aggiornamenti](#11-aggiornamenti)
-12. [Supporto](#12-supporto)
-13. [Privacy](#13-privacy)
-14. [Risoluzione problemi](#14-risoluzione-problemi)
-15. [Contatti](#15-contatti)
+11. [Marketing](#11-marketing)
+12. [Aggiornamenti](#12-aggiornamenti)
+13. [Supporto](#13-supporto)
+14. [Privacy](#14-privacy)
+15. [Risoluzione problemi](#15-risoluzione-problemi)
+16. [Contatti](#16-contatti)
 
 ---
 
@@ -374,7 +375,67 @@ I file automatici hanno data e ora nel nome. I backup manuali non vengono cancel
 
 ---
 
-## 11. Aggiornamenti
+## 11. Marketing
+
+La sezione **Marketing** ti permette di preparare **automazioni email** basate sui dati del file Excel collegato a un profilo sync (clienti, fidelity, punti, consensi).
+
+### Simulazione e invio reale
+
+Per impostazione predefinita l’app è in **modalità simulazione** (badge «Simulazione»): le email vengono preparate e registrate nello storico locale, **senza invio ai clienti**.
+
+L’**invio reale** (badge «Invio reale attivo») si abilita in **Impostazioni marketing → Dati azienda e brand** ed è gestito dal **backend Aven Labs** (non dal tuo PC). In questo modo:
+
+- non servono chiavi API sul computer del negozio;
+- il **reply-to** delle email è quello che hai configurato (email risposta del negozio);
+- ogni invio manuale richiede la conferma: *«Confermo di avere il consenso marketing dei destinatari»*.
+
+**Limiti:** massimo **50 destinatari** per singolo invio; automazioni giornaliere rispettano le regole anti-duplicati (es. un augurio di compleanno all’anno per cliente).
+
+### Configurazione guidata
+
+1. Apri **Marketing** dalla barra laterale.
+2. Clicca **Configura Marketing** e completa i 4 passi:
+   - scegli il **profilo sync** Excel;
+   - **mappa le colonne** (nome, email, data nascita, punti, consenso, ecc.);
+   - imposta **mittente** e nome negozio;
+   - conferma e attiva.
+
+### Automazioni disponibili
+
+| Tipo | Quando si attiva |
+|------|------------------|
+| **Compleanno** | Cliente con compleanno oggi |
+| **Soglia punti** | Punti fidelity ≥ soglia impostata |
+| **Nuova fidelity** | Attivazione card in data odierna |
+| **Cliente inattivo** | Nessun acquisto da N giorni |
+
+Per ogni automazione puoi:
+
+- scegliere un **template email**;
+- vedere l’**anteprima destinatari** (validi / senza email / senza consenso);
+- **simulare l’invio** (locale);
+- **testare il backend** (dry-run, nessuna email inviata);
+- **inviare email reali** (solo con invio reale attivo e conferma consenso);
+- inviare un’**email di test** (simulata in locale);
+
+### Template email (editor visuale)
+
+I template si compongono con **blocchi** (titolo, testo, bottone, premio, footer) — **non serve scrivere HTML**. Logo e colori del negozio si impostano in **Dati azienda e brand**.
+
+Variabili disponibili: `{{firstName}}`, `{{lastName}}`, `{{points}}`, `{{businessName}}`, `{{fidelityCardNumber}}`, `{{birthday}}`, `{{reward}}`.
+
+### Consensi
+
+Nella scheda **Consensi** puoi richiedere che venga inviato solo a clienti con consenso marketing valido, e definire i valori della colonna Excel considerati validi (es. `sì`, `true`, `1`).
+
+### Storico e backup
+
+- Lo **storico invii** resta sul PC e non viene incluso nel file di backup (per privacy).
+- Le impostazioni marketing (profili, automazioni, template, mittente) **sono incluse** nel backup delle impostazioni.
+
+---
+
+## 12. Aggiornamenti
 
 Easyfatt Sync può aggiornarsi alle nuove versioni pubblicate da Aven Labs.
 
@@ -399,7 +460,7 @@ Gli aggiornamenti **non** cancellano le tue impostazioni.
 
 ---
 
-## 12. Supporto
+## 13. Supporto
 
 Se qualcosa non funziona o hai dubbi sull’uso:
 
@@ -424,7 +485,7 @@ Indica:
 
 ---
 
-## 13. Privacy
+## 14. Privacy
 
 In sintesi:
 
@@ -445,7 +506,7 @@ Per i dettagli legali consulta **Privacy Policy** e **Termini** linkati nell'app
 
 ---
 
-## 14. Risoluzione problemi
+## 15. Risoluzione problemi
 
 ### Google non collegato
 
@@ -521,7 +582,7 @@ Easyfatt o Excel potrebbero tenere il file aperto.
 
 ---
 
-## 15. Contatti
+## 16. Contatti
 
 
 | Canale         | Dettaglio                                             |

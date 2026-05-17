@@ -258,6 +258,12 @@ easyfatt-sync-app/
 ├── appConstants.js         # Costanti prodotto / rebranding futuro
 ├── scheduler.js            # Watch, cron, backup automatico, multi-profilo
 ├── backup.js               # Backup/restore JSON (no diff/snapshot per privacy)
+├── marketingConstants.js   # Flag API, variabili template, tipi automazione
+├── marketingConfig.js      # electron-store marketingConfig, seed template
+├── marketingEngine.js      # Lettura Excel, evaluateAutomation, simulate
+├── marketingSender.js      # Invio batch verso API Aven Labs (Resend sul server)
+├── emailTemplateRenderer.js # HTML email brandizzato (blocchi + businessProfile)
+├── marketing-api/          # Next.js App Router — POST …/easyfatt-sync/send
 ├── updater.js              # electron-updater
 ├── support.js              # Invio richiesta supporto
 ├── supportConstants.js     # URL API, email
@@ -286,6 +292,7 @@ easyfatt-sync-app/
 │   ├── profiles-ui.js      # Gestione profili + empty state dinamico
 │   ├── history-ui.js       # Cronologia, filtri, click-to-detail
 │   ├── diff-detail-ui.js   # Modale Dettaglio sync (tab + GitHub diff)
+│   ├── marketing-ui.js     # Vista Marketing, wizard, automazioni, template
 │   └── onboarding-ui.js    # Wizard 6-step
 ├── legal/
 │   ├── privacy-easyfatt-sync.md
@@ -309,6 +316,10 @@ easyfatt-sync-app/
 | `syncHistory.js`       | Eventi sync + `diffSummary` inline + `syncHistoryDiffs` pruned          |
 | `scheduler.js`         | Automazioni temporizzate, watch file, multi-profilo                    |
 | `backup.js`            | Payload backup, restore, cleanup (no diff/snapshot)                    |
+| `marketingConfig.js`   | Normalizzazione `marketingConfig`, storico invii, seed template        |
+| `marketingEngine.js`   | Excel → clienti, regole automazione, simulazione, anteprima destinatari |
+| `marketingSender.js`   | POST verso `marketingApiUrl` (dry-run o invio reale)                    |
+| `emailTemplateRenderer.js` | Compilazione template a blocchi in HTML inline                      |
 | `updater.js`           | Check/download/install release GitHub                                  |
 | `support.js`           | Validazione form + fetch API                                            |
 | `renderer/nav-ui.js`   | Sidebar, viste, distribuzione accordion → view                          |
@@ -675,6 +686,79 @@ Nome automatico: `easyfatt-sync-backup-YYYY-MM-DD-HH-mm.json`
 - Settimanale: lunedì all’orario indicato.
 - Mensile: primo giorno del mese.
 - Cleanup: mantiene ultimi N file con pattern automatico; **non** cancella backup manuali.
+
+### Marketing nel backup
+
+- `config.marketingConfig` viene incluso (profili marketing, automazioni, template, mittente).
+- `marketingConfig.sendHistory` **non** viene incluso nel file di backup; al restore lo storico locale resta quello del PC.
+- Dopo restore, `normalizeMarketingConfig` riallinea la struttura.
+
+---
+
+## 9.1 Marketing (simulazione e invio reale)
+
+Modulo **additivo**: non modifica `sync.js` né i flussi OAuth/sync esistenti.
+
+### Store (`marketingConfig`)
+
+- `realSendEnabled` (default `false`) — abilita invio reale dall’UI
+- `marketingApiUrl` — default `https://aven-labs.com/api/marketing/easyfatt-sync/send`
+- `businessProfile`, `templates[]` (blocchi), `automations[]`, `sendHistory[]` con `eventKey` anti-duplicati
+
+### Flusso dati
+
+```
+renderer/marketing-ui.js
+  → preload IPC
+  → marketingEngine.js (Excel → destinatari idonei, anti-duplicati)
+  → marketingSender.js → POST marketing-api (Resend)
+```
+
+**Sicurezza app:** non invia token Google, file Excel completo né API key Resend. Solo destinatari necessari (max **50** per batch).
+
+### IPC principali
+
+| Canale | Ruolo |
+|--------|--------|
+| `simulate-marketing-automation` | Simulazione **locale** (storico `simulated`) |
+| `dry-run-marketing-automation` | Test backend (`metadata.dryRun=true`, nessun invio) |
+| `send-marketing-automation` | Invio reale (richiede `consentConfirmed` + `realSendEnabled`) |
+| `send-marketing-batch` | POST payload grezzo verso API |
+
+### Backend (AvenSite — produzione)
+
+Deploy su **AvenSite** (`Progetti/AvenSite`):
+
+- `app/api/marketing/easyfatt-sync/send/route.ts`
+- `lib/marketing/validateMarketingPayload.ts`
+- `lib/marketing/emailTemplateRenderer.js` (copia da `emailTemplateRenderer.js` della app)
+
+Riferimento locale: cartella `marketing-api/` in questo repo (stesso endpoint, per test con `npm run dev` sulla porta 3100).
+
+`POST /api/marketing/easyfatt-sync/send` — Next.js App Router + **Resend**.
+
+Env server: `RESEND_API_KEY`, `MARKETING_FROM_EMAIL`, `MARKETING_REPLY_FALLBACK`.
+
+- `metadata.dryRun=true` → elabora senza inviare
+- `dryRun=false` → invio reale, `replyTo` = `businessProfile.replyToEmail`
+- HTML da `template.blocks` + `emailTemplateRenderer` (logo URL opzionale; logo locale non inviato dall’app)
+
+### Scheduler
+
+Automazioni con `schedule.mode === "daily"`: alle ore configurate, se `realSendEnabled` → `executeAutomationSend`, altrimenti `simulateAutomationRun`.
+
+### Anti-duplicati (`sendHistory` + `eventKey`)
+
+- Compleanno: una volta/anno per cliente
+- Soglia punti: una volta per soglia
+- Nuova fidelity: una volta per cliente
+- Inattivo: `cooldownDays`
+
+### Tipi automazione
+
+`evaluateBirthdayAutomation`, `evaluatePointsThresholdAutomation`, `evaluateNewFidelityAutomation`, `evaluateInactiveCustomerAutomation` (wrapper su `evaluateCustomerForAutomation`).
+
+Consenso: `requireMarketingConsent` + `validConsentValues`; per invio manuale reale checkbox obbligatoria in UI.
 
 ---
 

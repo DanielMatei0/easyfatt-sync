@@ -45,8 +45,49 @@ const {
 const { pruneOrphanSnapshots, clearAllSnapshots } = require("./syncSnapshots");
 const { previewExcelFile } = require("./excelUtils");
 const { buildDiagnosticReport } = require("./diagnostics");
+const {
+  getMarketingConfig,
+  setMarketingConfig,
+  seedDefaultTemplates,
+  clearSendHistory,
+} = require("./marketingConfig");
+const {
+  loadMarketingRows,
+  getAutomationRecipients,
+  simulateAutomationRun,
+  simulateTestEmail,
+  getMarketingStats,
+  getAutomationRecipientsFromAutomation,
+  simulateAutomationDraft,
+  executeAutomationSend,
+  dryRunAutomationSend,
+} = require("./marketingEngine");
+const { sendMarketingBatch } = require("./marketingSender");
+const pkgVersion = require("./package.json").version;
 const fs = require("fs");
 const os = require("os");
+
+const MARKETING_ASSETS_DIR = "marketing-assets";
+
+function getMarketingAssetsDir() {
+  const dir = path.join(app.getPath("userData"), MARKETING_ASSETS_DIR);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function readLogoDataUrl(logoPath) {
+  if (!logoPath || !fs.existsSync(logoPath)) return "";
+  const ext = path.extname(logoPath).toLowerCase().replace(".", "");
+  const mime =
+    { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" }[ext] ||
+    "image/png";
+  try {
+    const buf = fs.readFileSync(logoPath);
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch {
+    return "";
+  }
+}
 
 const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 
@@ -58,6 +99,12 @@ let mainWindow;
 function sendHistoryUpdated() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("history-updated", getHistory(store));
+  }
+}
+
+function sendMarketingUpdated() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("marketing-updated", getMarketingConfig(store));
   }
 }
 
@@ -98,7 +145,7 @@ function sendConfigUpdated(config) {
 function restartScheduler(config) {
   const prepared = prepareConfigForScheduler(config, sendLog);
   stopScheduler();
-  if (shouldStartScheduler(prepared)) {
+  if (shouldStartScheduler(prepared, store)) {
     startScheduler(prepared, sendLog, store, sendConfigUpdated, app);
   }
   return prepared;
@@ -525,6 +572,208 @@ ipcMain.handle("build-diagnostic-report", () => {
       lastAutomaticAt: store.get("backupLastAutomaticAt") || null,
     },
   });
+});
+
+/* ── Marketing (locale / simulazione) ─────────────────────────── */
+
+ipcMain.handle("get-marketing-config", () => {
+  return getMarketingConfig(store);
+});
+
+ipcMain.handle("save-marketing-config", (_, config) => {
+  let next = setMarketingConfig(store, config);
+  if (next.enabled && !next.templates.length) {
+    next = setMarketingConfig(store, seedDefaultTemplates(next));
+  }
+  sendMarketingUpdated();
+  const appConfig = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  restartScheduler(appConfig);
+  return { ok: true, config: next };
+});
+
+ipcMain.handle("get-marketing-stats", async () => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  return getMarketingStats(store, config);
+});
+
+ipcMain.handle("preview-marketing-excel", async (_, payload) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  const syncProfileId = payload?.syncProfileId;
+  const profile = syncProfileId
+    ? findProfile(config, syncProfileId)
+    : getActiveProfile(config);
+
+  if (!profile?.excelPath) {
+    throw new Error("Seleziona un profilo sync con file Excel configurato.");
+  }
+
+  try {
+    const data = await loadMarketingRows(profile);
+    return {
+      ok: true,
+      headers: data.headers,
+      sampleRows: (data.rows || []).slice(0, 12),
+      totalRows: data.totalRows,
+      syncProfileId: profile.id,
+      syncProfileName: profile.name,
+    };
+  } catch (error) {
+    throw new Error(toClientMessage(error, "sync"));
+  }
+});
+
+ipcMain.handle("get-automation-recipients", async (_, automationId) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  try {
+    return await getAutomationRecipients(store, config, automationId);
+  } catch (error) {
+    throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("preview-marketing-automation-draft", async (_, payload) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  try {
+    const automation = payload?.automation;
+    if (!automation) throw new Error("Dati automazione mancanti.");
+    return await getAutomationRecipientsFromAutomation(
+      store,
+      config,
+      automation,
+      payload?.columnMappingOverride
+    );
+  } catch (error) {
+    throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("simulate-marketing-automation-draft", async (_, payload) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  try {
+    const automation = payload?.automation;
+    if (!automation) throw new Error("Dati automazione mancanti.");
+    const result = await simulateAutomationDraft(
+      store,
+      config,
+      automation,
+      payload?.columnMappingOverride
+    );
+    sendMarketingUpdated();
+    return result;
+  } catch (error) {
+    throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("simulate-marketing-automation", async (_, automationId) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  try {
+    const result = await simulateAutomationRun(store, config, automationId);
+    sendMarketingUpdated();
+    return result;
+  } catch (error) {
+    throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("simulate-marketing-test-email", async (_, payload) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  try {
+    const result = await simulateTestEmail(store, config, payload || {});
+    sendMarketingUpdated();
+    return result;
+  } catch (error) {
+    throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("clear-marketing-history", () => {
+  clearSendHistory(store);
+  sendMarketingUpdated();
+  return { ok: true };
+});
+
+ipcMain.handle("send-marketing-batch", async (_, payload) => {
+  const marketing = getMarketingConfig(store);
+  return sendMarketingBatch({
+    marketingApiUrl: marketing.marketingApiUrl,
+    payload,
+    dryRun: !!payload?.metadata?.dryRun,
+    realSendEnabled: marketing.realSendEnabled,
+  });
+});
+
+ipcMain.handle("send-marketing-automation", async (_, payload) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  try {
+    const result = await executeAutomationSend(store, config, payload?.automationId, {
+      dryRun: false,
+      consentConfirmed: !!payload?.consentConfirmed,
+      appVersion: pkgVersion,
+    });
+    sendMarketingUpdated();
+    return result;
+  } catch (error) {
+    throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("dry-run-marketing-automation", async (_, automationId) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  try {
+    const result = await dryRunAutomationSend(store, config, automationId, pkgVersion);
+    sendMarketingUpdated();
+    return result;
+  } catch (error) {
+    throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("pick-marketing-logo", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "Seleziona logo azienda",
+    properties: ["openFile"],
+    filters: [{ name: "Immagini", extensions: ["png", "jpg", "jpeg", "webp"] }],
+  });
+  if (result.canceled || !result.filePaths?.length) {
+    return { ok: false, canceled: true };
+  }
+  const src = result.filePaths[0];
+  const ext = path.extname(src).toLowerCase() || ".png";
+  const dest = path.join(getMarketingAssetsDir(), `logo${ext}`);
+  fs.copyFileSync(src, dest);
+  return { ok: true, logoPath: dest };
+});
+
+ipcMain.handle("get-marketing-logo-data-url", (_, logoPath) => {
+  return readLogoDataUrl(logoPath);
+});
+
+ipcMain.handle("render-marketing-email-preview", (_, payload) => {
+  const { renderMarketingEmail } = require("./emailTemplateRenderer");
+  const marketing = getMarketingConfig(store);
+  const template = payload?.template;
+  if (!template) throw new Error("Template mancante.");
+  const logoDataUrl = readLogoDataUrl(
+    payload?.logoPath || marketing.businessProfile?.logoPath
+  );
+  return renderMarketingEmail(template, marketing, payload?.customer, { logoDataUrl });
+});
+
+ipcMain.handle("compile-marketing-template", (_, payload) => {
+  const { compileBlocksToHtml, buildVariableMap, SAMPLE_CUSTOMER, getBusinessProfile } =
+    require("./emailTemplateRenderer");
+  const marketing = getMarketingConfig(store);
+  const template = payload?.template;
+  if (!template) throw new Error("Template mancante.");
+  const bp = getBusinessProfile(marketing);
+  const logoDataUrl = readLogoDataUrl(payload?.logoPath || bp.logoPath);
+  if (logoDataUrl) bp.logoDataUrl = logoDataUrl;
+  const variableMap = buildVariableMap(SAMPLE_CUSTOMER, bp);
+  const bodyHtml = compileBlocksToHtml(template.blocks || [], bp, variableMap, {
+    previewText: template.previewText,
+  });
+  return { bodyHtml, bodyText: require("./emailTemplateRenderer").stripHtmlToText(bodyHtml) };
 });
 
 ipcMain.handle("backup-test", async () => {

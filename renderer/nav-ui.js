@@ -99,7 +99,7 @@
         target === "settings" ||
         target === "notifications" ||
         target === "backup";
-      saveBar.hidden = !showSave;
+      saveBar.hidden = !showSave || target === "marketing";
     }
 
     if (!options || options.persist !== false) {

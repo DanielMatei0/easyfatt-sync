@@ -29,6 +29,7 @@ Applicazione desktop **Electron** (Aven Labs) per sincronizzare l'export clienti
 | **Notifiche desktop** | Nativa su successo/errore |
 | **Promemoria sync mancata** | Notifica solo se in giornata non è stata fatta sync |
 | **Backup manuale + automatico** | Giornaliero/settimanale/mensile con rotazione |
+| **Marketing** | Automazioni email da Excel; simulazione locale (default) o invio reale via backend Aven Labs (Resend), max 50 destinatari/batch |
 | **Supporto integrato** | Modulo + report diagnostico sanitizzato |
 | **Aggiornamenti automatici** | `electron-updater` su GitHub Releases (consenso utente) |
 | **Tema chiaro/scuro** | Persistito, completo su tutta l'UI |

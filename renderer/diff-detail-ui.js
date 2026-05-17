@@ -110,7 +110,9 @@
       t.setAttribute("aria-selected", isActive ? "true" : "false");
     });
     els.panels.forEach((p) => {
-      p.hidden = p.dataset.diffPanel !== name;
+      const isActive = p.dataset.diffPanel === name;
+      p.hidden = !isActive;
+      if (isActive) p.scrollTop = 0;
     });
   }
 

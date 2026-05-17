@@ -42,6 +42,10 @@ const MODULES_TO_LOAD = [
   "backup.js",
   "updater.js",
   "errors.js",
+  "emailTemplateRenderer.js",
+  "marketingConfig.js",
+  "marketingEngine.js",
+  "marketingSender.js",
 ];
 
 const errors = [];
