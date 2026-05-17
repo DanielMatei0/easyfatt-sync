@@ -32,8 +32,9 @@ function getDefaultMarketingConfig() {
     deletedAutomationNames: {},
     automationWizardDraft: null,
     businessProfile: getDefaultBusinessProfile(),
-    realSendEnabled: false,
+    realSendEnabled: true,
     marketingApiUrl: MARKETING_API_URL,
+    runMarketingAfterSync: true,
   };
 }
 
@@ -374,8 +375,9 @@ function normalizeMarketingConfig(raw) {
     sendHistory,
     deletedAutomationNames: normalizeDeletedAutomationNames(cfg.deletedAutomationNames),
     automationWizardDraft: normalizeAutomationWizardDraft(cfg.automationWizardDraft),
-    realSendEnabled: !!cfg.realSendEnabled,
+    realSendEnabled: cfg.realSendEnabled === false ? false : true,
     marketingApiUrl: String(cfg.marketingApiUrl || MARKETING_API_URL).trim() || MARKETING_API_URL,
+    runMarketingAfterSync: cfg.runMarketingAfterSync !== false,
   };
 }
 

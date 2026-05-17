@@ -7,7 +7,7 @@ const {
   logoutGoogle,
 } = require("./auth");
 const { startScheduler, stopScheduler, shouldStartScheduler } = require("./scheduler");
-const { runSync, runSyncAll } = require("./syncRunner");
+const { runSync, runSyncAll, setPostMarketingHook } = require("./syncRunner");
 const {
   mergeConfig,
   getDefaultConfig,
@@ -160,6 +160,10 @@ function scheduleStartupUpdateCheck() {
     });
   }, AUTO_UPDATE_CHECK_DELAY_MS);
 }
+
+setPostMarketingHook(() => {
+  sendMarketingUpdated();
+});
 
 app.whenReady().then(() => {
   if (process.platform === "darwin" && app.dock) {

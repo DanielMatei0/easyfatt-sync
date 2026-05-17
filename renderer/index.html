@@ -870,16 +870,24 @@
                 <section class="mkt-real-send-settings">
                   <h3 class="mkt-subsection-title">Invio email reale</h3>
                   <label class="check-item mkt-check">
-                    <input type="checkbox" id="mktRealSendEnabled" />
+                    <input type="checkbox" id="mktRealSendEnabled" checked />
                     <span class="check-box" aria-hidden="true"></span>
                     <span class="check-text">
-                      <span class="check-title">Abilita invio reale (backend Aven Labs)</span>
-                      <span class="check-desc">Quando attivo, puoi inviare email vere ai clienti con consenso. Default: solo simulazione locale.</span>
+                      <span class="check-title">Invio reale attivo (backend Aven Labs)</span>
+                      <span class="check-desc">Invia email vere ai clienti con consenso. Disattiva per usare solo simulazione locale.</span>
                     </span>
                   </label>
                   <label class="mkt-field mkt-field-span-2">
                     <span class="field-label">URL API marketing</span>
                     <input type="url" id="mktMarketingApiUrl" class="mkt-input" placeholder="https://aven-labs.com/api/marketing/easyfatt-sync/send" />
+                  </label>
+                  <label class="check-item mkt-check mkt-field-span-2">
+                    <input type="checkbox" id="mktRunMarketingAfterSync" checked />
+                    <span class="check-box" aria-hidden="true"></span>
+                    <span class="check-text">
+                      <span class="check-title">Controlla email dopo ogni sync automatica</span>
+                      <span class="check-desc">Dopo watch o sync programmata, valuta le automazioni e invia/simula senza intervento manuale.</span>
+                    </span>
                   </label>
                 </section>
                 <button type="button" id="marketingSaveBrandBtn" class="btn btn-primary">Salva dati azienda</button>

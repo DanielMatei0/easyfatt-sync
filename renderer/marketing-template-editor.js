@@ -30,6 +30,7 @@
   let previewMode = "desktop";
   let logoDataUrl = "";
   let openOptions = {};
+  let addBlockMenuBound = false;
 
   function $(id) {
     return document.getElementById(id);
@@ -286,17 +287,46 @@
     });
   }
 
+  function closeAddBlockMenu() {
+    const menu = $("mTplAddBlockMenu");
+    if (menu) menu.hidden = true;
+  }
+
+  function toggleAddBlockMenu() {
+    const menu = $("mTplAddBlockMenu");
+    if (!menu) return;
+    menu.hidden = !menu.hidden;
+  }
+
   function bindAddBlockMenu() {
-    $("mTplAddBlockBtn")?.addEventListener("click", () => {
-      const menu = $("mTplAddBlockMenu");
-      if (menu) menu.hidden = !menu.hidden;
+    if (addBlockMenuBound) return;
+    addBlockMenuBound = true;
+
+    const toolbar = document.querySelector(".mkt-tpl-blocks-toolbar");
+    const btn = $("mTplAddBlockBtn");
+    const menu = $("mTplAddBlockMenu");
+
+    btn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleAddBlockMenu();
     });
-    $("mTplAddBlockMenu")?.querySelectorAll("[data-block-type]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        addBlock(btn.dataset.blockType);
-        const menu = $("mTplAddBlockMenu");
-        if (menu) menu.hidden = true;
+
+    menu?.querySelectorAll("[data-block-type]").forEach((item) => {
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        addBlock(item.dataset.blockType);
+        closeAddBlockMenu();
       });
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!menu || menu.hidden) return;
+      if (toolbar?.contains(e.target)) return;
+      closeAddBlockMenu();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAddBlockMenu();
     });
   }
 
@@ -359,12 +389,14 @@
     }
     overlay.hidden = false;
     document.body.classList.add("mkt-modal-open");
+    closeAddBlockMenu();
     renderEditor();
     bindVariableChips();
     await refreshPreview();
   }
 
   function close() {
+    closeAddBlockMenu();
     const overlay = $("marketingTemplateOverlay");
     if (overlay) overlay.hidden = true;
     document.body.classList.remove("mkt-modal-open");
@@ -451,12 +483,6 @@
         }
         schedulePreview();
       });
-    });
-    document.addEventListener("click", (e) => {
-      const menu = $("mTplAddBlockMenu");
-      if (menu && !menu.hidden && !e.target.closest(".mkt-tpl-blocks-toolbar")) {
-        menu.hidden = true;
-      }
     });
   }
 

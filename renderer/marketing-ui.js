@@ -912,6 +912,9 @@
       $("mktMarketingApiUrl").value =
         marketingConfig?.marketingApiUrl || "https://aven-labs.com/api/marketing/easyfatt-sync/send";
     }
+    if ($("mktRunMarketingAfterSync")) {
+      $("mktRunMarketingAfterSync").checked = marketingConfig?.runMarketingAfterSync !== false;
+    }
     refreshBrandLogoPreview();
   }
 
@@ -1518,6 +1521,7 @@
       const businessProfile = collectBrandProfileFromForm();
       const realSendEnabled = !!$("mktRealSendEnabled")?.checked;
       const marketingApiUrl = $("mktMarketingApiUrl")?.value?.trim() || "";
+      const runMarketingAfterSync = $("mktRunMarketingAfterSync")?.checked !== false;
       await saveMarketing({
         businessProfile,
         businessName: businessProfile.businessName,
@@ -1526,6 +1530,7 @@
         senderEmail: $("marketingSenderEmail")?.value?.trim() || "",
         realSendEnabled,
         marketingApiUrl: marketingApiUrl || undefined,
+        runMarketingAfterSync,
       });
       showFeedback($("marketingBrandFeedback"), "Impostazioni salvate.", false);
       updateSimBanner();
@@ -1688,9 +1693,17 @@
     });
   }
 
+  async function ensureRealSendActivated() {
+    if (!marketingConfig?.enabled) return;
+    if (marketingConfig.realSendEnabled) return;
+    await saveMarketing({ realSendEnabled: true });
+    showToast("Invio reale marketing attivato.", { info: true });
+  }
+
   async function init() {
     if (!document.querySelector('[data-view="marketing"]')) return;
     await loadData();
+    await ensureRealSendActivated();
     window.EasyfattAutomationWizard?.init?.({
       getMarketingConfig: () => marketingConfig,
       getAppConfig: () => appConfig,

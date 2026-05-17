@@ -728,10 +728,17 @@
         <input type="checkbox" id="mAutoWizEnabled" ${state.enabled !== false ? "checked" : ""} />
         <span class="mkt-toggle-card-body"><strong>Automazione attiva</strong><span>Se disattivata, non verrà eseguita automaticamente.</span></span>
       </label>
-      <div class="mkt-sim-banner" role="status">
+      ${
+        getConfig().realSendEnabled
+          ? `<div class="mkt-sim-banner mkt-sim-banner-live" role="status">
+        <strong>Invio reale attivo</strong>
+        <span>Le automazioni programmate inviano email tramite Aven Labs. Per gli invii manuali è richiesta la conferma del consenso marketing.</span>
+      </div>`
+          : `<div class="mkt-sim-banner" role="status">
         <strong>Solo simulazione</strong>
-        <span>L'invio reale non è ancora abilitato. Le esecuzioni restano simulate in locale.</span>
-      </div>`;
+        <span>L'invio reale non è abilitato. Attivalo in Impostazioni marketing → Dati azienda e brand.</span>
+      </div>`
+      }`;
     $("mAutoWizEnabled")?.addEventListener("change", (e) => {
       state.enabled = e.target.checked;
     });

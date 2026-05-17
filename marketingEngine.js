@@ -1014,6 +1014,110 @@ async function simulateTestEmail(store, appConfig, { templateId, testEmail }) {
   };
 }
 
+/**
+ * Dopo una sync automatica: valuta automazioni collegate al profilo Excel
+ * ed esegue invio (reale o simulazione) se ci sono destinatari idonei.
+ */
+async function processMarketingAfterSync(store, appConfig, syncProfileId, log = () => {}, options = {}) {
+  const marketing = getMarketingConfig(store);
+  const trigger = options.trigger || "auto";
+  const appVersion = options.appVersion || "";
+
+  if (!marketing.enabled) {
+    return { ok: true, skipped: true, reason: "marketing_disabled" };
+  }
+  if (marketing.runMarketingAfterSync === false) {
+    return { ok: true, skipped: true, reason: "run_after_sync_disabled" };
+  }
+  if (!syncProfileId) {
+    return { ok: true, skipped: true, reason: "no_sync_profile" };
+  }
+
+  const linkedMarketingProfiles = (marketing.marketingProfiles || []).filter(
+    (p) => p.syncProfileId === syncProfileId
+  );
+  if (!linkedMarketingProfiles.length) {
+    return { ok: true, skipped: true, reason: "no_marketing_profile_for_sync" };
+  }
+
+  const marketingProfileIds = new Set(linkedMarketingProfiles.map((p) => p.id));
+  const automations = (marketing.automations || []).filter(
+    (a) => isAutomationRunnable(a) && marketingProfileIds.has(a.marketingProfileId)
+  );
+
+  if (!automations.length) {
+    return { ok: true, skipped: true, reason: "no_automations" };
+  }
+
+  log(
+    `[Marketing] Controllo post-sync (${trigger}): ${automations.length} automazione/i per profilo Excel.`
+  );
+
+  const processed = [];
+
+  for (const automation of automations) {
+    try {
+      const preview = await getAutomationRecipients(store, appConfig, automation.id);
+      const validCount = preview.summary?.valid ?? 0;
+
+      if (!validCount) {
+        processed.push({
+          automationId: automation.id,
+          name: automation.name,
+          ok: true,
+          skipped: true,
+          reason: "no_recipients",
+        });
+        continue;
+      }
+
+      log(`[Marketing] «${automation.name}»: ${validCount} destinatario/i idoneo/i.`);
+
+      let result;
+      if (marketing.realSendEnabled) {
+        result = await executeAutomationSend(store, appConfig, automation.id, {
+          dryRun: false,
+          consentConfirmed: true,
+          appVersion,
+        });
+        log(`[Marketing] «${automation.name}»: ${result.message || "invio completato"}`);
+      } else {
+        result = await simulateAutomationRun(store, appConfig, automation.id);
+        log(`[Marketing] «${automation.name}»: ${result.message || "simulazione completata"}`);
+      }
+
+      processed.push({
+        automationId: automation.id,
+        name: automation.name,
+        ok: true,
+        validCount,
+        recipientsCount: result.recipientsCount ?? validCount,
+        message: result.message,
+        simulated: result.simulated,
+      });
+    } catch (error) {
+      const message = error?.message || "Errore marketing post-sync";
+      log(`[Marketing] Errore «${automation.name || automation.id}»: ${message}`);
+      processed.push({
+        automationId: automation.id,
+        name: automation.name,
+        ok: false,
+        error: message,
+      });
+    }
+  }
+
+  const withRecipients = processed.filter((p) => p.validCount > 0 || p.recipientsCount > 0).length;
+
+  return {
+    ok: true,
+    syncProfileId,
+    automationsChecked: automations.length,
+    automationsWithRecipients: withRecipients,
+    processed,
+  };
+}
+
 function getMarketingStats(store, appConfig) {
   const marketing = getMarketingConfig(store);
   const activeAutomations = marketing.automations.filter((a) => isAutomationRunnable(a)).length;
@@ -1058,6 +1162,7 @@ module.exports = {
   dryRunAutomationSend,
   simulateAutomationDraft,
   simulateAutomationRun,
+  processMarketingAfterSync,
   getMarketingStats,
   simulateTestEmail,
   isValidEmail,

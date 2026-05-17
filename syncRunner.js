@@ -78,6 +78,46 @@ function basenameSafe(p) {
 
 let syncInProgress = false;
 let syncQueue = Promise.resolve();
+let postMarketingHook = null;
+
+function setPostMarketingHook(fn) {
+  postMarketingHook = typeof fn === "function" ? fn : null;
+}
+
+async function runMarketingAfterSyncIfNeeded(store, profileId, log, trigger) {
+  const automaticTriggers = new Set(["watch", "schedule", "auto"]);
+  if (!automaticTriggers.has(trigger)) return null;
+
+  try {
+    const { processMarketingAfterSync } = require("./marketingEngine");
+    const { ensureConfigMigrated } = require("./syncState");
+    const appConfig = ensureConfigMigrated(store.get("config") || {});
+    let appVersion = "";
+    try {
+      appVersion = require("./package.json").version || "";
+    } catch {
+      /* ignore */
+    }
+
+    const result = await processMarketingAfterSync(store, appConfig, profileId, log, {
+      trigger,
+      appVersion,
+    });
+
+    if (postMarketingHook) {
+      try {
+        await postMarketingHook(result);
+      } catch {
+        /* ignore UI hook errors */
+      }
+    }
+
+    return result;
+  } catch (error) {
+    log(`[Marketing] Post-sync: ${error.message || "errore"}`);
+    return null;
+  }
+}
 let currentSyncProfileId = null;
 const lastFingerprintByProfile = new Map();
 
@@ -200,7 +240,24 @@ async function runSyncInternal(profile, log, store, options = {}) {
       notifySyncSuccess(rows, profileName);
     }
 
-    return { ...result, profileId, profileName, durationMs, diffSummary };
+    let marketingAfterSync = null;
+    if (!result?.skipped && profileId) {
+      marketingAfterSync = await runMarketingAfterSyncIfNeeded(
+        store,
+        profileId,
+        profileLog,
+        trigger
+      );
+    }
+
+    return {
+      ...result,
+      profileId,
+      profileName,
+      durationMs,
+      diffSummary,
+      marketingAfterSync,
+    };
   } catch (error) {
     const clientMessage = toClientMessage(error, "sync");
     const durationMs = Date.now() - startedAt;
@@ -274,4 +331,5 @@ module.exports = {
   runSync,
   runSyncAll,
   isSyncInProgress,
+  setPostMarketingHook,
 };

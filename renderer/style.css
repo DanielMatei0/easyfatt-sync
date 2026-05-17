@@ -4199,6 +4199,15 @@ body[data-theme="dark"] .mkt-overlay .mkt-select {
   color: var(--muted);
 }
 
+.mkt-sim-banner-live {
+  background: var(--status-success-bg);
+  border-color: var(--status-success-text);
+}
+
+.mkt-sim-banner-live > strong {
+  color: var(--status-success-text);
+}
+
 /* Empty state */
 .mkt-empty {
   text-align: center;
@@ -5075,6 +5084,10 @@ body.mkt-modal-open {
   border: 1px solid var(--border);
   background: var(--card);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.mkt-add-block-menu[hidden] {
+  display: none !important;
 }
 
 .mkt-add-block-menu button {
