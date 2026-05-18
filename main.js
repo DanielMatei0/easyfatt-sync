@@ -47,11 +47,11 @@ const { previewExcelFile } = require("./excelUtils");
 const { buildDiagnosticReport } = require("./diagnostics");
 const fs = require("fs");
 const os = require("os");
+const { getWindowIconPath, applyDockIcon } = require("./assetPaths");
 
 const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 
 const store = new Store();
-const APP_ICON_PATH = path.join(__dirname, "assets", "icon.png");
 
 let mainWindow;
 
@@ -62,12 +62,13 @@ function sendHistoryUpdated() {
 }
 
 function createWindow() {
+  const windowIcon = getWindowIconPath();
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    icon: APP_ICON_PATH,
+    ...(windowIcon ? { icon: windowIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -115,9 +116,7 @@ function scheduleStartupUpdateCheck() {
 }
 
 app.whenReady().then(() => {
-  if (process.platform === "darwin" && app.dock) {
-    app.dock.setIcon(APP_ICON_PATH);
-  }
+  applyDockIcon();
 
   createWindow();
   const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());

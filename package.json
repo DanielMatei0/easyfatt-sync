@@ -35,6 +35,13 @@
       "!**/*.log"
     ],
     "asar": true,
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": [
         {

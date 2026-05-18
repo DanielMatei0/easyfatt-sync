@@ -12,6 +12,7 @@ const ROOT = path.join(__dirname, "..");
 
 const REQUIRED_FILES = [
   "main.js",
+  "assetPaths.js",
   "preload.js",
   "package.json",
   "oauth_credentials.example.json",
@@ -131,6 +132,22 @@ function checkPackageJson(pkg) {
     fail(`build.mac.artifactName inatteso: ${build.mac?.artifactName}`);
   } else {
     pass("build.mac.artifactName stabile OK");
+  }
+
+  const extra = build.extraResources;
+  const hasAssetsExtra =
+    Array.isArray(extra) &&
+    extra.some(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        item.from === "assets" &&
+        item.to === "assets",
+    );
+  if (!hasAssetsExtra) {
+    fail("build.extraResources deve copiare assets/ fuori da app.asar");
+  } else {
+    pass("build.extraResources assets OK");
   }
 
   if (build.mac?.hardenedRuntime !== false) {
