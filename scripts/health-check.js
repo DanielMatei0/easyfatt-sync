@@ -14,7 +14,9 @@ delete process.env.ELECTRON_RUN_AS_NODE;
 
 const REQUIRED_FILES = [
   "main.js",
-  "assetPaths.js",
+  "src/main/assetPaths.js",
+  "src/main/auth.js",
+  "src/main/sync.js",
   "preload.js",
   "package.json",
   "oauth_credentials.example.json",
@@ -38,18 +40,18 @@ const REQUIRED_SCRIPTS = [
 ];
 
 const MODULES_TO_LOAD = [
-  "auth.js",
-  "sync.js",
-  "syncRunner.js",
-  "scheduler.js",
-  "backup.js",
-  "updater.js",
-  "errors.js",
-  "emailTemplateRenderer.js",
-  "marketingConfig.js",
-  "marketingEngine.js",
-  "marketingSender.js",
-  "assetPaths.js",
+  "src/main/auth.js",
+  "src/main/sync.js",
+  "src/main/syncRunner.js",
+  "src/main/scheduler.js",
+  "src/main/backup.js",
+  "src/main/updater.js",
+  "src/main/errors.js",
+  "src/main/emailTemplateRenderer.js",
+  "src/main/marketingConfig.js",
+  "src/main/marketingEngine.js",
+  "src/main/marketingSender.js",
+  "src/main/assetPaths.js",
 ];
 
 const errors = [];

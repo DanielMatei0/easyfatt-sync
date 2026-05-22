@@ -94,7 +94,7 @@ async function runMarketingAfterSyncIfNeeded(store, profileId, log, trigger) {
     const appConfig = ensureConfigMigrated(store.get("config") || {});
     let appVersion = "";
     try {
-      appVersion = require("./package.json").version || "";
+      appVersion = require("../../package.json").version || "";
     } catch {
       /* ignore */
     }

@@ -1,6 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 
+const APP_ROOT = path.join(__dirname, "..", "..");
+
 function getElectronApi() {
   const electron = require("electron");
   return electron && typeof electron === "object" ? electron : {};
@@ -27,7 +29,7 @@ function getAssetPath(fileName) {
     }
   }
 
-  return path.join(__dirname, "assets", fileName);
+  return path.join(APP_ROOT, "assets", fileName);
 }
 
 function getExistingAssetPath(fileName) {

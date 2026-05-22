@@ -357,7 +357,7 @@ function scheduleMarketingDailyJobs(store, log) {
             );
             const marketingCfg = getMarketingConfig(store);
             if (marketingCfg.realSendEnabled) {
-              const pkg = require("./package.json");
+              const pkg = require("../../package.json");
               await executeAutomationSend(store, appConfig, automationId, {
                 dryRun: false,
                 consentConfirmed: true,

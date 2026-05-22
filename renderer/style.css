@@ -5553,25 +5553,107 @@ body.mkt-modal-open {
 
 .mkt-dns-record {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 10px 12px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--card);
 }
 
-.mkt-dns-record span {
+.mkt-dns-group-label {
   color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-top: 8px;
+}
+
+.mkt-dns-record-list {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mkt-dns-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mkt-dns-item {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mkt-dns-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.mkt-dns-type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-muted);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.mkt-dns-record code {
+.mkt-dns-host {
+  min-width: 0;
   color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.mkt-dns-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.mkt-dns-fields div {
+  min-width: 0;
+}
+
+.mkt-dns-fields .is-wide {
+  grid-column: 1 / -1;
+}
+
+.mkt-dns-fields dt {
+  margin: 0 0 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mkt-dns-fields dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.mkt-dns-fields code {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
   overflow-wrap: anywhere;
   white-space: normal;
 }

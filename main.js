@@ -5,9 +5,9 @@ const {
   startGoogleOAuthFlow,
   isGoogleAuthorized,
   logoutGoogle,
-} = require("./auth");
-const { startScheduler, stopScheduler, shouldStartScheduler } = require("./scheduler");
-const { runSync, runSyncAll, setPostMarketingHook } = require("./syncRunner");
+} = require("./src/main/auth");
+const { startScheduler, stopScheduler, shouldStartScheduler } = require("./src/main/scheduler");
+const { runSync, runSyncAll, setPostMarketingHook } = require("./src/main/syncRunner");
 const {
   mergeConfig,
   getDefaultConfig,
@@ -17,34 +17,34 @@ const {
   getActiveProfile,
   findProfile,
   validateSyncProfiles,
-} = require("./syncState");
-const { LEGAL_VERSION } = require("./legalConstants");
-const { submitSupportRequest, getPlatformLabel } = require("./support");
-const { applyOpenAtLoginSetting } = require("./loginSettings");
+} = require("./src/main/syncState");
+const { LEGAL_VERSION } = require("./src/main/legalConstants");
+const { submitSupportRequest, getPlatformLabel } = require("./src/main/support");
+const { applyOpenAtLoginSetting } = require("./src/main/loginSettings");
 const {
   buildSuggestedBackupFilename,
   createBackup,
   previewBackup,
   restoreBackup,
-} = require("./backup");
-const { toClientMessage } = require("./errors");
-const { computeHealthStatus } = require("./healthStatus");
+} = require("./src/main/backup");
+const { toClientMessage } = require("./src/main/errors");
+const { computeHealthStatus } = require("./src/main/healthStatus");
 const {
   getHistory,
   filterHistory,
   exportHistoryReport,
   getDiffDetails,
   clearHistory,
-} = require("./syncHistory");
-const { pruneOrphanSnapshots, clearAllSnapshots } = require("./syncSnapshots");
-const { previewExcelFile } = require("./excelUtils");
-const { buildDiagnosticReport } = require("./diagnostics");
+} = require("./src/main/syncHistory");
+const { pruneOrphanSnapshots, clearAllSnapshots } = require("./src/main/syncSnapshots");
+const { previewExcelFile } = require("./src/main/excelUtils");
+const { buildDiagnosticReport } = require("./src/main/diagnostics");
 const {
   getMarketingConfig,
   setMarketingConfig,
   seedDefaultTemplates,
   clearSendHistory,
-} = require("./marketingConfig");
+} = require("./src/main/marketingConfig");
 const {
   loadMarketingRows,
   getAutomationRecipients,
@@ -55,12 +55,12 @@ const {
   simulateAutomationDraft,
   executeAutomationSend,
   dryRunAutomationSend,
-} = require("./marketingEngine");
-const { sendMarketingBatch, verifyMarketingSender } = require("./marketingSender");
+} = require("./src/main/marketingEngine");
+const { sendMarketingBatch, verifyMarketingSender } = require("./src/main/marketingSender");
 const pkgVersion = require("./package.json").version;
 const fs = require("fs");
 const os = require("os");
-const { getWindowIconPath, applyDockIcon } = require("./assetPaths");
+const { getWindowIconPath, applyDockIcon } = require("./src/main/assetPaths");
 
 const MARKETING_ASSETS_DIR = "marketing-assets";
 const DEV_UPDATE_MESSAGE = "Aggiornamenti disponibili solo nella versione installata.";
@@ -92,7 +92,7 @@ const store = new Store();
 let mainWindow;
 
 function getUpdater() {
-  return require("./updater");
+  return require("./src/main/updater");
 }
 
 function sendHistoryUpdated() {
@@ -883,7 +883,7 @@ ipcMain.handle("get-marketing-logo-data-url", (_, logoPath) => {
 });
 
 ipcMain.handle("render-marketing-email-preview", (_, payload) => {
-  const { renderMarketingEmail } = require("./emailTemplateRenderer");
+  const { renderMarketingEmail } = require("./src/main/emailTemplateRenderer");
   const marketing = getMarketingConfig(store);
   const template = payload?.template;
   if (!template) throw new Error("Template mancante.");
@@ -895,7 +895,7 @@ ipcMain.handle("render-marketing-email-preview", (_, payload) => {
 
 ipcMain.handle("compile-marketing-template", (_, payload) => {
   const { compileBlocksToHtml, buildVariableMap, SAMPLE_CUSTOMER, getBusinessProfile } =
-    require("./emailTemplateRenderer");
+    require("./src/main/emailTemplateRenderer");
   const marketing = getMarketingConfig(store);
   const template = payload?.template;
   if (!template) throw new Error("Template mancante.");
@@ -906,7 +906,7 @@ ipcMain.handle("compile-marketing-template", (_, payload) => {
   const bodyHtml = compileBlocksToHtml(template.blocks || [], bp, variableMap, {
     previewText: template.previewText,
   });
-  return { bodyHtml, bodyText: require("./emailTemplateRenderer").stripHtmlToText(bodyHtml) };
+  return { bodyHtml, bodyText: require("./src/main/emailTemplateRenderer").stripHtmlToText(bodyHtml) };
 });
 
 ipcMain.handle("backup-test", async () => {

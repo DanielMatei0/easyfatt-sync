@@ -69,7 +69,7 @@ Il cliente finale non configura Google Cloud: usa credenziali OAuth **centralizz
 └─┬─────────┬──────────┬──────────┬──────────┬──────────┬──────────────┘
   │         │          │          │          │          │
   ▼         ▼          ▼          ▼          ▼          ▼
-scheduler  syncRunner  auth.js   backup.js  updater.js  support.js
+src/main/scheduler  src/main/syncRunner  src/main/auth  backup  updater  support
   │         │
   │         ├──── sync.js (xlsx + Google Sheets)
   │         ├──── diffEngine.js  (normalizza + calcola diff)
@@ -170,9 +170,9 @@ Ogni `restartScheduler` esegue `stopScheduler()` (chiude watcher, ferma cron, ca
 
 Pipeline:
 
-1. `sync.js` — legge Excel (async + retry), prepara matrice valori, chiama Google Sheets API. Restituisce anche `headers` e `normalizedRows` per il diff.
-2. `syncRunner.js` — orchestrazione: mutex `syncInProgress`, notifiche, `recordSyncSuccess`. **Post-sync**: chiama `computeDiffAndSnapshot()` che (a) recupera snapshot precedente, (b) calcola diff via `diffEngine.calculateDiff`, (c) salva il nuovo snapshot, (d) passa `diffSummary` + `diffDetails` a `recordSyncEvent`.
-3. `diffEngine.js` — `normalizeRows`, `getRowKey` (primary key configurabile / candidate `Codice`/`Email` / hash MD5 fallback), `calculateDiff` con limite `MAX_DIFF_TOTAL` per file enormi.
+1. `src/main/sync.js` — legge Excel (async + retry), prepara matrice valori, chiama Google Sheets API. Restituisce anche `headers` e `normalizedRows` per il diff.
+2. `src/main/syncRunner.js` — orchestrazione: mutex `syncInProgress`, notifiche, `recordSyncSuccess`. **Post-sync**: chiama `computeDiffAndSnapshot()` che (a) recupera snapshot precedente, (b) calcola diff via `diffEngine.calculateDiff`, (c) salva il nuovo snapshot, (d) passa `diffSummary` + `diffDetails` a `recordSyncEvent`.
+3. `src/main/diffEngine.js` — `normalizeRows`, `getRowKey` (primary key configurabile / candidate `Codice`/`Email` / hash MD5 fallback), `calculateDiff` con limite `MAX_DIFF_TOTAL` per file enormi.
 4. `syncSnapshots.js` — persistenza snapshot per profilo, `pruneOrphanSnapshots` al salvataggio config, `clearAllSnapshots` al reset cronologia.
 5. `syncHistory.js` — `recordSyncEvent` con `diffSummary` inline; `syncHistoryDiffs` separati con pruning (`MAX_DIFF_EVENTS=50`, `MAX_DIFF_ROWS_DETAIL=500`).
 6. `sheetRange.js` — range dinamico colonne (non più `A:Z` fisso).
@@ -202,7 +202,7 @@ runSync(profile)
 
 ### Google OAuth
 
-Modulo: `auth.js`.
+Modulo: `src/main/auth.js`.
 
 - Credenziali app: `oauth_credentials.json` (root progetto, **non** in git).
 - Token utente: `%APPDATA%/EasyfattSync/token.json` (Windows) o `~/EasyfattSync/token.json` (macOS/Linux).
@@ -244,35 +244,17 @@ easyfatt-sync-app/
 ├── oauth_credentials.json          # Credenziali reali (gitignored, solo locale/build)
 ├── main.js                 # Entry Electron, IPC, lifecycle
 ├── preload.js              # Bridge sicuro renderer ↔ main
-├── auth.js                 # OAuth Google, token file
-├── sync.js                 # Excel → Google Sheets (ritorna headers + normalizedRows)
-├── syncRunner.js           # Mutex sync, notifiche, post-sync diff & snapshot
-├── syncState.js            # Profili sync, merge, migrazione legacy
-├── syncHistory.js          # Cronologia eventi (max 500) + diffSummary inline + diff details separati
-├── syncSnapshots.js        # Snapshot Excel per profilo (electron-store, pruning orfani)
-├── diffEngine.js           # Normalizzazione, row key, calculateDiff stile GitHub
-├── healthStatus.js         # Calcolo dashboard salute
-├── excelUtils.js           # Validazione/preview Excel, retry lettura
-├── columnMapping.js        # Mapping colonne per profilo
-├── diagnostics.js          # Report diagnostico supporto (sanitizzato, no diff details)
-├── appConstants.js         # Costanti prodotto / rebranding futuro
-├── scheduler.js            # Watch, cron, backup automatico, multi-profilo
-├── backup.js               # Backup/restore JSON (no diff/snapshot per privacy)
-├── marketingConstants.js   # Flag API, variabili template, tipi automazione
-├── marketingConfig.js      # electron-store marketingConfig, seed template
-├── marketingEngine.js      # Lettura Excel, evaluateAutomation, simulate
-├── marketingSender.js      # Invio batch verso API Aven Labs (Resend sul server)
-├── emailTemplateRenderer.js # HTML email brandizzato (blocchi + businessProfile)
+├── src/
+│   └── main/               # Moduli runtime del main process Electron
+│       ├── auth.js         # OAuth Google, token file
+│       ├── sync.js         # Excel → Google Sheets (ritorna headers + normalizedRows)
+│       ├── syncRunner.js   # Mutex sync, notifiche, post-sync diff & snapshot
+│       ├── syncState.js    # Profili sync, merge, migrazione legacy
+│       ├── marketingConfig.js
+│       ├── marketingEngine.js
+│       ├── marketingSender.js
+│       └── emailTemplateRenderer.js
 ├── marketing-api/          # Next.js App Router — POST …/easyfatt-sync/send
-├── updater.js              # electron-updater
-├── support.js              # Invio richiesta supporto
-├── supportConstants.js     # URL API, email
-├── supportIssueTypes.js    # Etichette tipo problema
-├── notifications.js        # Notifiche desktop native
-├── loginSettings.js        # Avvio con il sistema (openAtLogin)
-├── errors.js               # Messaggi errore UI
-├── sheetRange.js           # Helper range Sheets
-├── legalConstants.js       # Versione legale, URL policy
 ├── package.json            # Scripts, electron-builder, publish (version: 26.0.0)
 ├── UPDATES.md              # Workflow release operativo + secret GitHub Actions
 ├── VERSIONING.md           # Strategia calendar versioning (MAJOR = anno)
@@ -308,20 +290,20 @@ easyfatt-sync-app/
 | ---------------------- | ---------------------------------------------------------------------- |
 | `main.js`              | Window, IPC, collegamento moduli, `restartScheduler`, prune snapshot   |
 | `preload.js`           | API `window.easyfattSync` (incluso `getHistoryDiff`, `clearSyncHistory`) |
-| `auth.js`              | OAuth loopback, read/write token, cache client                         |
-| `sync.js`              | Lettura XLSX, clear/update Sheets, ritorna `normalizedRows`            |
-| `syncRunner.js`        | Mutex sync, notifiche, **diff & snapshot post-sync**                   |
-| `diffEngine.js`        | **Normalizza righe, getRowKey, calculateDiff (added/modified/removed)** |
-| `syncSnapshots.js`     | **Snapshot Excel per profilo, prune orfani, clear all**                 |
-| `syncHistory.js`       | Eventi sync + `diffSummary` inline + `syncHistoryDiffs` pruned          |
-| `scheduler.js`         | Automazioni temporizzate, watch file, multi-profilo                    |
-| `backup.js`            | Payload backup, restore, cleanup (no diff/snapshot)                    |
-| `marketingConfig.js`   | Normalizzazione `marketingConfig`, storico invii, seed template        |
-| `marketingEngine.js`   | Excel → clienti, regole automazione, simulazione, anteprima destinatari |
-| `marketingSender.js`   | POST verso `marketingApiUrl` (dry-run o invio reale)                    |
-| `emailTemplateRenderer.js` | Compilazione template a blocchi in HTML inline                      |
-| `updater.js`           | Check/download/install release GitHub                                  |
-| `support.js`           | Validazione form + fetch API                                            |
+| `src/main/auth.js`              | OAuth loopback, read/write token, cache client                 |
+| `src/main/sync.js`              | Lettura XLSX, clear/update Sheets, ritorna `normalizedRows`    |
+| `src/main/syncRunner.js`        | Mutex sync, notifiche, **diff & snapshot post-sync**           |
+| `src/main/diffEngine.js`        | **Normalizza righe, getRowKey, calculateDiff**                 |
+| `src/main/syncSnapshots.js`     | **Snapshot Excel per profilo, prune orfani, clear all**        |
+| `src/main/syncHistory.js`       | Eventi sync + `diffSummary` inline + `syncHistoryDiffs` pruned |
+| `src/main/scheduler.js`         | Automazioni temporizzate, watch file, multi-profilo            |
+| `src/main/backup.js`            | Payload backup, restore, cleanup (no diff/snapshot)            |
+| `src/main/marketingConfig.js`   | Normalizzazione `marketingConfig`, storico invii, seed template |
+| `src/main/marketingEngine.js`   | Excel → clienti, regole automazione, simulazione               |
+| `src/main/marketingSender.js`   | POST verso `marketingApiUrl` (dry-run o invio reale)           |
+| `src/main/emailTemplateRenderer.js` | Compilazione template a blocchi in HTML inline              |
+| `src/main/updater.js`           | Check/download/install release GitHub                          |
+| `src/main/support.js`           | Validazione form + fetch API                                    |
 | `renderer/nav-ui.js`   | Sidebar, viste, distribuzione accordion → view                          |
 | `renderer/diff-detail-ui.js` | Modale Dettaglio sync, render GitHub diff                         |
 | `renderer/renderer.js` | Logica UI, attività, form, modali, theme                                |
@@ -731,7 +713,7 @@ Deploy su **AvenSite** (`Progetti/AvenSite`):
 
 - `app/api/marketing/easyfatt-sync/send/route.ts`
 - `lib/marketing/validateMarketingPayload.ts`
-- `lib/marketing/emailTemplateRenderer.js` (copia da `emailTemplateRenderer.js` della app)
+- `lib/marketing/emailTemplateRenderer.js` (copia da `src/main/emailTemplateRenderer.js` della app)
 
 Riferimento locale: cartella `marketing-api/` in questo repo (stesso endpoint, per test con `npm run dev` sulla porta 3100).
 

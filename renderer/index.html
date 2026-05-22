@@ -1202,9 +1202,18 @@
                       <li><strong>Torna qui e controlla</strong><span>Quando i DNS sono propagati, il dominio diventa “Verificato”.</span></li>
                     </ol>
                     <div class="mkt-dns-records" aria-label="Record DNS da configurare">
-                      <div class="mkt-dns-record"><span>SPF</span><code id="marketingDnsSpf">Clicca “Salva mittente” per generare i record.</code></div>
-                      <div class="mkt-dns-record"><span>DKIM</span><code id="marketingDnsDkim">Clicca “Salva mittente” per generare i record.</code></div>
-                      <div class="mkt-dns-record"><span>DMARC</span><code id="marketingDnsDmarc">v=DMARC1; p=none;</code></div>
+                      <div class="mkt-dns-record">
+                        <span class="mkt-dns-group-label">SPF</span>
+                        <div id="marketingDnsSpf" class="mkt-dns-record-list">Clicca “Salva mittente” per generare i record.</div>
+                      </div>
+                      <div class="mkt-dns-record">
+                        <span class="mkt-dns-group-label">DKIM</span>
+                        <div id="marketingDnsDkim" class="mkt-dns-record-list">Clicca “Salva mittente” per generare i record.</div>
+                      </div>
+                      <div class="mkt-dns-record">
+                        <span class="mkt-dns-group-label">DMARC</span>
+                        <div id="marketingDnsDmarc" class="mkt-dns-record-list">v=DMARC1; p=none;</div>
+                      </div>
                     </div>
                   </div>
 

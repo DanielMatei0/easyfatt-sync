@@ -116,6 +116,7 @@
   let automationFilter = "all";
   let createAutomationTypePreset = null;
   let sendConfirmAutomationId = null;
+  let senderVerificationBusy = false;
 
   function createId(prefix) {
     if (window.crypto?.randomUUID) return `${prefix}_${crypto.randomUUID()}`;
@@ -164,8 +165,9 @@
     const type = String(record.type || "").trim();
     const name = String(record.name || "").trim() || "@";
     const value = String(record.value || "").trim();
-    const priority = record.priority != null ? ` priority ${record.priority}` : "";
-    return [type, name, value].filter(Boolean).join(" ") + priority;
+    const priority = record.priority != null ? ` | Priorità: ${record.priority}` : "";
+    const ttl = record.ttl ? ` | TTL: ${record.ttl}` : "";
+    return `Tipo: ${type || "-"} | Nome/Host: ${name} | Valore: ${value || "-"}${priority}${ttl}`;
   }
 
   function getDnsRecordsByType(verification, recordType) {
@@ -175,18 +177,63 @@
     );
   }
 
-  function setDnsText(id, text) {
+  function renderDnsRecordItem(record) {
+    const type = String(record?.type || "").trim() || "-";
+    const name = String(record?.name || "").trim() || "@";
+    const value = String(record?.value || "").trim() || "-";
+    const priority = record?.priority != null ? String(record.priority) : "";
+    const ttl = String(record?.ttl || "").trim();
+
+    return `
+      <article class="mkt-dns-item">
+        <div class="mkt-dns-item-head">
+          <span class="mkt-dns-type">${escapeHtml(type)}</span>
+          <span class="mkt-dns-host">${escapeHtml(name)}</span>
+        </div>
+        <dl class="mkt-dns-fields">
+          <div>
+            <dt>Tipo</dt>
+            <dd>${escapeHtml(type)}</dd>
+          </div>
+          <div>
+            <dt>Nome / Host</dt>
+            <dd>${escapeHtml(name)}</dd>
+          </div>
+          <div class="is-wide">
+            <dt>Valore</dt>
+            <dd><code>${escapeHtml(value)}</code></dd>
+          </div>
+          ${
+            priority
+              ? `<div><dt>Priorità</dt><dd>${escapeHtml(priority)}</dd></div>`
+              : ""
+          }
+          ${ttl ? `<div><dt>TTL</dt><dd>${escapeHtml(ttl)}</dd></div>` : ""}
+        </dl>
+      </article>
+    `;
+  }
+
+  function renderDnsRecordList(id, records) {
     const el = $(id);
-    if (el) el.textContent = text || "Clicca “Salva mittente” per generare i record.";
+    if (!el) return;
+    if (!records?.length) {
+      el.innerHTML = `<p class="mkt-dns-empty">Clicca “Salva mittente” per generare i record.</p>`;
+      return;
+    }
+    el.innerHTML = records.map(renderDnsRecordItem).join("");
   }
 
   function renderDnsRecords(senderEmail, verification) {
     const domain = getSenderDomain(senderEmail);
-    const spf = getDnsRecordsByType(verification, "SPF").map(formatDnsRecord).filter(Boolean);
-    const dkim = getDnsRecordsByType(verification, "DKIM").map(formatDnsRecord).filter(Boolean);
-    setDnsText("marketingDnsSpf", spf.join(" | "));
-    setDnsText("marketingDnsDkim", dkim.join(" | "));
-    setDnsText("marketingDnsDmarc", domain ? `TXT _dmarc.${domain} v=DMARC1; p=none;` : "");
+    const spf = getDnsRecordsByType(verification, "SPF");
+    const dkim = getDnsRecordsByType(verification, "DKIM");
+    const dmarc = domain
+      ? [{ type: "TXT", name: `_dmarc.${domain}`, value: "v=DMARC1; p=none;" }]
+      : [];
+    renderDnsRecordList("marketingDnsSpf", spf);
+    renderDnsRecordList("marketingDnsDkim", dkim);
+    renderDnsRecordList("marketingDnsDmarc", dmarc);
   }
 
   function getSenderStatusCopy(senderEmail, verification) {
@@ -1692,14 +1739,33 @@
   }
 
   async function saveSenderSettings() {
+    if (senderVerificationBusy) return;
     const senderEmail = $("marketingSenderEmail")?.value?.trim() || "";
-    await saveMarketing({ senderEmail, senderVerification: null });
-    if (!senderEmail) {
-      showFeedback($("marketingSenderFeedback"), "Mittente rimosso.", false);
-      renderBrandProfile();
-      return;
+    const previousVerification = getSenderVerification(senderEmail);
+    const saveBtn = $("marketingSaveSenderBtn");
+    if (saveBtn) saveBtn.disabled = true;
+    showFeedback($("marketingSenderFeedback"), "Salvo mittente...", false);
+
+    try {
+      await saveMarketing({
+        senderEmail,
+        senderVerification: previousVerification,
+      });
+      if (!senderEmail) {
+        showFeedback($("marketingSenderFeedback"), "Mittente rimosso.", false);
+        renderBrandProfile();
+        return;
+      }
+      await refreshSenderVerification("prepare");
+    } catch (error) {
+      showFeedback(
+        $("marketingSenderFeedback"),
+        userMessage(error, "Non sono riuscito a salvare il mittente."),
+        true
+      );
+    } finally {
+      if (saveBtn) saveBtn.disabled = false;
     }
-    await refreshSenderVerification("prepare");
   }
 
   function buildDnsInstructions() {
@@ -1719,36 +1785,71 @@
   }
 
   async function refreshSenderVerification(action = "verify") {
+    if (senderVerificationBusy) return;
     const senderEmail = $("marketingSenderEmail")?.value?.trim() || marketingConfig?.senderEmail || "";
     if (!senderEmail) {
       showFeedback($("marketingSenderFeedback"), "Inserisci prima un indirizzo email mittente.", true);
       return;
     }
+    if (typeof api()?.verifyMarketingSender !== "function") {
+      showFeedback(
+        $("marketingSenderFeedback"),
+        "Riavvia l’app per attivare la verifica DNS del mittente.",
+        true
+      );
+      return;
+    }
 
-    showFeedback(
-      $("marketingSenderFeedback"),
-      action === "verify" ? "Controllo verifica in corso..." : "Genero i record DNS...",
-      false
-    );
+    senderVerificationBusy = true;
+    try {
+      showFeedback(
+        $("marketingSenderFeedback"),
+        action === "verify" ? "Controllo verifica in corso..." : "Genero i record DNS...",
+        false
+      );
 
-    const result = await api()?.verifyMarketingSender?.({ senderEmail, action });
-    const verification = {
-      ...(result || {}),
-      senderEmail: senderEmail.toLowerCase(),
-      domain: result?.domain || getSenderDomain(senderEmail),
-      updatedAt: new Date().toISOString(),
-    };
-    await saveMarketing({
-      senderEmail,
-      senderVerification: verification,
-    });
+      let result;
+      try {
+        result = await api().verifyMarketingSender({ senderEmail, action });
+      } catch (error) {
+        result = {
+          ok: false,
+          status: "bridge_error",
+          message: userMessage(error, "Errore durante la verifica DNS del mittente."),
+          records: [],
+        };
+      }
+      const previousVerification = getSenderVerification(senderEmail);
+      const backendRecords = Array.isArray(result?.records) ? result.records : [];
+      const records = backendRecords.length ? backendRecords : previousVerification?.records || [];
+      const hasMissingDomainRecords =
+        result?.ok !== false && !isGmailAddress(senderEmail) && getSenderDomain(senderEmail) && !records.length;
+      const verification = {
+        ...(result || {}),
+        senderEmail: senderEmail.toLowerCase(),
+        domain: result?.domain || getSenderDomain(senderEmail),
+        ok: hasMissingDomainRecords ? false : result?.ok !== false,
+        status: hasMissingDomainRecords ? "records_missing" : result?.status,
+        message: hasMissingDomainRecords
+          ? "Backend raggiunto, ma non ha restituito i record DNS. Riprova tra poco."
+          : result?.message,
+        records,
+        updatedAt: new Date().toISOString(),
+      };
+      await saveMarketing({
+        senderEmail,
+        senderVerification: verification,
+      });
 
-    showFeedback(
-      $("marketingSenderFeedback"),
-      userMessage(result?.message || verification.message, "Verifica mittente aggiornata."),
-      result?.ok === false
-    );
-    renderBrandProfile();
+      showFeedback(
+        $("marketingSenderFeedback"),
+        userMessage(verification.message || result?.message, "Verifica mittente aggiornata."),
+        verification.ok === false
+      );
+      renderBrandProfile();
+    } finally {
+      senderVerificationBusy = false;
+    }
   }
 
   async function copyDnsInstructions() {
@@ -1822,9 +1923,27 @@
 
     $("marketingTemplateCloseBtn")?.addEventListener("click", closeTemplateModal);
 
-    $("marketingSaveSenderBtn")?.addEventListener("click", saveSenderSettings);
-    $("marketingCopyDnsBtn")?.addEventListener("click", copyDnsInstructions);
-    $("marketingCheckDomainBtn")?.addEventListener("click", () => refreshSenderVerification("verify"));
+    document.addEventListener("click", (e) => {
+      const saveSender = e.target.closest("#marketingSaveSenderBtn");
+      if (saveSender) {
+        e.preventDefault();
+        saveSenderSettings();
+        return;
+      }
+
+      const copyDns = e.target.closest("#marketingCopyDnsBtn");
+      if (copyDns) {
+        e.preventDefault();
+        copyDnsInstructions();
+        return;
+      }
+
+      const checkDomain = e.target.closest("#marketingCheckDomainBtn");
+      if (checkDomain) {
+        e.preventDefault();
+        refreshSenderVerification("verify");
+      }
+    });
     $("marketingSenderEmail")?.addEventListener("input", () => {
       marketingConfig = {
         ...(marketingConfig || {}),

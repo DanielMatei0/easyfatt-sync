@@ -29,7 +29,8 @@ const net = require("net");
 const path = require("path");
 const { shell } = require("electron");
 
-const CREDENTIALS_PATH = path.join(__dirname, "oauth_credentials.json");
+const APP_ROOT = path.join(__dirname, "..", "..");
+const CREDENTIALS_PATH = path.join(APP_ROOT, "oauth_credentials.json");
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const OAUTH_TIMEOUT_MS = 2 * 60 * 1000;
 

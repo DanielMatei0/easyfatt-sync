@@ -32,7 +32,7 @@ L'app Electron può puntare a `http://localhost:3100/api/marketing/easyfatt-sync
 
 ## Deploy
 
-Deployare questa cartella su `aven-labs.com` (Vercel o hosting Next.js). Il modulo `emailTemplateRenderer.js` della app padre viene caricato dal percorso relativo `../../emailTemplateRenderer`.
+Deployare questa cartella su `aven-labs.com` (Vercel o hosting Next.js). Il modulo `emailTemplateRenderer.js` della app padre viene caricato dal percorso relativo `../../src/main/emailTemplateRenderer`.
 
 ## Sicurezza
 
