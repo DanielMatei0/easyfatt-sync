@@ -38,6 +38,7 @@
     // Map: id accordion-item → view target
     const mapping = [
       { id: "accordion-google", target: "settings" },
+      { id: "accordion-email-sender", target: "settings" },
       { id: "trigger-automation", target: "settings", closest: true },
       { id: "trigger-privacy", target: "about", closest: true },
       { id: "trigger-updates", target: "about", closest: true },

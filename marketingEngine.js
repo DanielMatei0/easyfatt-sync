@@ -396,9 +396,14 @@ async function loadCustomersForMarketingProfile(
   columnMappingOverride
 ) {
   const marketing = getMarketingConfig(store);
-  const mProfile = marketing.marketingProfiles.find((p) => p.id === marketingProfileId);
+  const profiles = marketing.marketingProfiles || [];
+  const mProfile =
+    profiles.find((p) => p.id === marketingProfileId) ||
+    (profiles.length === 1 ? profiles[0] : null);
   if (!mProfile) {
-    throw new Error("Profilo marketing non trovato.");
+    throw new Error(
+      "Profilo clienti non trovato. Apri Marketing > Impostazioni e collega il file Excel clienti."
+    );
   }
 
   const effectiveProfile = columnMappingOverride
@@ -526,6 +531,7 @@ function buildBackendBusinessProfile(marketing) {
   return {
     businessName: bp.businessName,
     senderName: bp.senderName,
+    senderEmail: marketing.senderEmail || "",
     replyToEmail: bp.replyToEmail,
     phone: bp.phone,
     website: bp.website,

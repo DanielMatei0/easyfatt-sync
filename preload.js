@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("easyfattSync", {
     ipcRenderer.invoke("simulate-marketing-test-email", payload),
   clearMarketingHistory: () => ipcRenderer.invoke("clear-marketing-history"),
   sendMarketingBatch: (payload) => ipcRenderer.invoke("send-marketing-batch", payload),
+  verifyMarketingSender: (payload) => ipcRenderer.invoke("verify-marketing-sender", payload),
   sendMarketingAutomation: (payload) => ipcRenderer.invoke("send-marketing-automation", payload),
   dryRunMarketingAutomation: (automationId) =>
     ipcRenderer.invoke("dry-run-marketing-automation", automationId),

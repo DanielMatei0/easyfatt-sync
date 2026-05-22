@@ -43,15 +43,15 @@
   const AUTO_CATEGORIES = [
     {
       id: "fidelity_points",
-      label: "Soglia punti",
-      desc: "Notifica quando i punti fidelity raggiungono una soglia.",
+      label: "Premio punti",
+      desc: "Avvisa il cliente quando ha raggiunto un premio o una soglia fidelity.",
       types: ["points_threshold"],
       icon: "fidelity",
     },
     {
       id: "fidelity_new",
-      label: "Nuova fidelity card",
-      desc: "Benvenuto per chi attiva una nuova card fidelity.",
+      label: "Benvenuto fidelity",
+      desc: "Accogli chi attiva una nuova card con un messaggio automatico.",
       types: ["new_fidelity"],
       icon: "fidelity",
     },
@@ -71,8 +71,8 @@
     },
     {
       id: "custom",
-      label: "Personalizzate",
-      desc: "Campagne su misura con regole flessibili.",
+      label: "Newsletter semplice",
+      desc: "Invia un messaggio personalizzato a una lista di clienti selezionati.",
       types: ["custom"],
       icon: "custom",
     },
@@ -132,6 +132,101 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  function userMessage(error, fallback = "Operazione non riuscita.") {
+    const raw = String(error?.message || error || fallback).trim();
+    return raw
+      .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+      .replace(/^Error:\s*/i, "")
+      .trim() || fallback;
+  }
+
+  function getSenderDomain(email) {
+    const value = String(email || "").trim().toLowerCase();
+    const match = /^[^\s@]+@([^\s@]+\.[^\s@]+)$/.exec(value);
+    return match ? match[1] : "";
+  }
+
+  function isGmailAddress(email) {
+    return /@(gmail\.com|googlemail\.com)$/i.test(String(email || "").trim());
+  }
+
+  function getSenderVerification(email) {
+    const normalized = String(email || "").trim().toLowerCase();
+    const verification = marketingConfig?.senderVerification;
+    if (!verification || verification.senderEmail !== normalized) return null;
+    return verification;
+  }
+
+  function formatDnsRecord(record) {
+    if (!record) return "";
+    const type = String(record.type || "").trim();
+    const name = String(record.name || "").trim() || "@";
+    const value = String(record.value || "").trim();
+    const priority = record.priority != null ? ` priority ${record.priority}` : "";
+    return [type, name, value].filter(Boolean).join(" ") + priority;
+  }
+
+  function getDnsRecordsByType(verification, recordType) {
+    const wanted = String(recordType || "").toUpperCase();
+    return (verification?.records || []).filter(
+      (record) => String(record.record || "").toUpperCase() === wanted
+    );
+  }
+
+  function setDnsText(id, text) {
+    const el = $(id);
+    if (el) el.textContent = text || "Clicca “Salva mittente” per generare i record.";
+  }
+
+  function renderDnsRecords(senderEmail, verification) {
+    const domain = getSenderDomain(senderEmail);
+    const spf = getDnsRecordsByType(verification, "SPF").map(formatDnsRecord).filter(Boolean);
+    const dkim = getDnsRecordsByType(verification, "DKIM").map(formatDnsRecord).filter(Boolean);
+    setDnsText("marketingDnsSpf", spf.join(" | "));
+    setDnsText("marketingDnsDkim", dkim.join(" | "));
+    setDnsText("marketingDnsDmarc", domain ? `TXT _dmarc.${domain} v=DMARC1; p=none;` : "");
+  }
+
+  function getSenderStatusCopy(senderEmail, verification) {
+    if (!senderEmail) {
+      return {
+        tone: "muted",
+        label: "Da configurare",
+        hint: "Inserisci l’indirizzo che vuoi mostrare nelle campagne.",
+      };
+    }
+    if (isGmailAddress(senderEmail)) {
+      return {
+        tone: "accent",
+        label: "Gmail come risposta",
+        hint:
+          verification?.message ||
+          "Per Gmail personale useremo un mittente Aven verificato e imposteremo questa email come Reply-To.",
+      };
+    }
+    if (verification?.verified || verification?.status === "verified") {
+      return {
+        tone: "success",
+        label: "Dominio verificato",
+        hint: verification.message || "Dominio verificato: puoi usare questo mittente per l’invio reale.",
+      };
+    }
+    if (verification?.ok === false || ["error", "backend_not_configured", "network_error"].includes(verification?.status)) {
+      return {
+        tone: "danger",
+        label: "Verifica non riuscita",
+        hint: verification.message || "Non siamo riusciti a controllare il dominio. Riprova tra poco.",
+      };
+    }
+    return {
+      tone: "muted",
+      label: verification ? "DNS da completare" : "Dominio da verificare",
+      hint:
+        verification?.message ||
+        "Salva il mittente per generare i record DNS, poi aggiungili nel provider del dominio.",
+    };
   }
 
   function fmtDate(iso) {
@@ -341,8 +436,9 @@
   }
 
   function setMarketingTab(tab) {
+    const visibleTab = tab === "history" || tab === "consent" ? "setup" : tab;
     document.querySelectorAll(".mkt-tab").forEach((btn) => {
-      const active = btn.dataset.marketingTab === tab;
+      const active = btn.dataset.marketingTab === visibleTab;
       btn.classList.toggle("is-active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
@@ -375,6 +471,7 @@
     const textWrap = banner.querySelector(".mkt-sim-banner-text");
     if (!textWrap) return;
     const real = !!marketingConfig?.realSendEnabled;
+    banner.classList.toggle("mkt-sim-banner-live", real);
     if (real) {
       textWrap.innerHTML =
         "<strong>Invio reale attivo.</strong> <span>Le automazioni programmate possono inviare email tramite il backend Aven Labs. Per gli invii manuali è richiesta la conferma del consenso marketing.</span>";
@@ -390,6 +487,77 @@
     const main = $("marketingMainContent");
     if (empty) empty.hidden = enabled;
     if (main) main.hidden = !enabled;
+  }
+
+  function getMarketingReadiness() {
+    const profile = getPrimaryMarketingProfile();
+    const mapping = profile?.columnMapping || {};
+    const mappedCount = Object.keys(mapping).filter((key) => mapping[key]).length;
+    const activeAutomations = (marketingConfig?.automations || []).filter(
+      (a) => a.enabled && !a.archived
+    );
+    const templates = marketingConfig?.templates || [];
+    const businessProfile = marketingConfig?.businessProfile || {};
+    const hasBrand =
+      !!businessProfile.businessName ||
+      !!marketingConfig?.businessName ||
+      !!businessProfile.senderName ||
+      !!marketingConfig?.senderName;
+
+    return {
+      profile,
+      mappedCount,
+      hasEmail: !!mapping.email,
+      hasConsent: !!mapping.marketingConsent,
+      hasBrand,
+      templates,
+      activeAutomations,
+    };
+  }
+
+  function renderSetupChecklist() {
+    const text = $("marketingReadinessText");
+    const state = getMarketingReadiness();
+    const clientsReady = !!state.profile?.syncProfileId && state.hasEmail;
+    const emailReady = state.templates.length > 0;
+    const sendReady = clientsReady && emailReady && state.activeAutomations.length > 0;
+    const completed = [clientsReady, emailReady, sendReady].filter(Boolean).length;
+
+    if (text) {
+      text.textContent =
+        completed === 3
+          ? "Tutto pronto: controlla i destinatari e invia quando vuoi."
+          : `${completed}/3 passi pronti. Continua dal primo riquadro non completato.`;
+    }
+
+    const clientDesc = $("marketingClientStepDesc");
+    if (clientDesc) {
+      clientDesc.textContent = clientsReady
+        ? `${getSyncProfileName(state.profile.syncProfileId)} collegato. ${state.mappedCount} campi pronti.`
+        : "Collega il file Excel e mappa almeno la colonna Email.";
+    }
+    const emailDesc = $("marketingEmailStepDesc");
+    if (emailDesc) {
+      emailDesc.textContent = emailReady
+        ? `${state.templates.length} email pronte. Puoi modificarle o crearne una nuova.`
+        : "Crea un template email prima di preparare una campagna.";
+    }
+    const sendDesc = $("marketingSendStepDesc");
+    if (sendDesc) {
+      sendDesc.textContent = sendReady
+        ? `${state.activeAutomations.length} campagne attive. Controlla i destinatari prima dell’invio.`
+        : "Crea una campagna attiva, poi controlla destinatari e invio.";
+    }
+
+    const cards = [
+      ["marketingClientStepCard", clientsReady],
+      ["marketingEmailStepCard", emailReady],
+      ["marketingSendStepCard", sendReady],
+    ];
+    cards.forEach(([id, ready]) => {
+      const card = $(id);
+      if (card) card.dataset.ready = ready ? "true" : "false";
+    });
   }
 
   async function refreshStats() {
@@ -442,13 +610,15 @@
   }
 
   function renderOverview() {
+    renderSetupChecklist();
     const list = $("marketingOverviewList");
     if (!list) return;
     const profiles = marketingConfig?.marketingProfiles || [];
     const autos = marketingConfig?.automations || [];
+    const templates = marketingConfig?.templates || [];
     if (!profiles.length) {
       list.innerHTML =
-        '<li class="mkt-overview-empty muted-text">Completa la configurazione per vedere il riepilogo.</li>';
+        '<li class="mkt-overview-empty muted-text">Completa la configurazione per vedere il riepilogo dei dati collegati.</li>';
       return;
     }
     list.innerHTML = profiles
@@ -459,9 +629,9 @@
         return `<li class="mkt-overview-item">
           <div class="mkt-overview-item-head">
             <strong>${escapeHtml(p.name)}</strong>
-            <span class="mkt-pill" data-tone="accent">${activeCount} attive</span>
+            <span class="mkt-pill" data-tone="${activeCount ? "success" : "muted"}">${activeCount} attive</span>
           </div>
-          <p class="muted-text">${escapeHtml(syncName)} · ${mapped} campi mappati</p>
+          <p class="muted-text">${escapeHtml(syncName)} · ${mapped} campi mappati · ${templates.length} template email</p>
         </li>`;
       })
       .join("");
@@ -511,11 +681,11 @@
             <span class="mkt-pill" data-tone="${stats.statusTone}">${escapeHtml(stats.statusLabel)}</span>
           </div>
           <p class="mkt-category-card-desc">${escapeHtml(cat.desc)}</p>
-          <p class="mkt-category-card-meta"><span><strong>${stats.active}</strong> attive</span><span> · </span><span>${stats.visible} automazioni</span></p>
+          <p class="mkt-category-card-meta"><span><strong>${stats.active}</strong> attive</span><span> · </span><span>${stats.visible} create</span></p>
         </div>
         <footer class="mkt-category-card-foot">
-          <button type="button" class="btn btn-secondary btn-sm" data-cat-action="open" data-category="${cat.id}">Apri</button>
-          <button type="button" class="btn btn-primary btn-sm" data-cat-action="create" data-category="${cat.id}">Nuova automazione</button>
+          <button type="button" class="btn btn-primary btn-sm" data-cat-action="create" data-category="${cat.id}">Usa questo percorso</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-cat-action="open" data-category="${cat.id}">Vedi campagne</button>
         </footer>
       </article>`;
     }).join("");
@@ -577,15 +747,18 @@
             <div><dt>Modalità</dt><dd>${escapeHtml(scheduleLabel)}</dd></div>
           </dl>
           <footer class="mkt-auto-card-foot">
-            <button type="button" class="btn btn-ghost btn-sm" data-action="edit" data-id="${a.id}">Modifica</button>
-            <button type="button" class="btn btn-ghost btn-sm" data-action="duplicate" data-id="${a.id}">Duplica</button>
-            <button type="button" class="btn btn-secondary btn-sm" data-action="preview" data-id="${a.id}">Anteprima</button>
-            <button type="button" class="btn btn-primary btn-sm" data-action="simulate" data-id="${a.id}"${canSimulate ? "" : " disabled"}>Simula</button>
-            ${realSend && canSimulate ? `<button type="button" class="btn btn-primary btn-sm mkt-btn-send-real" data-action="send-real" data-id="${a.id}">Invia email reali</button>` : ""}
-            ${canSimulate ? `<button type="button" class="btn btn-ghost btn-sm" data-action="dry-run" data-id="${a.id}">Test backend</button>` : ""}
-            ${life === "archived" ? `<button type="button" class="btn btn-ghost btn-sm" data-action="unarchive" data-id="${a.id}">Ripristina</button>` : `<button type="button" class="btn btn-ghost btn-sm" data-action="archive" data-id="${a.id}">Archivia</button>`}
-            ${life === "active" ? `<button type="button" class="btn btn-ghost btn-sm" data-action="disable" data-id="${a.id}">Disattiva</button>` : life === "disabled" ? `<button type="button" class="btn btn-ghost btn-sm" data-action="enable" data-id="${a.id}">Attiva</button>` : ""}
-            <button type="button" class="btn btn-ghost btn-sm mkt-btn-danger-text" data-action="delete" data-id="${a.id}">Elimina</button>
+            <div class="mkt-auto-primary-actions">
+              <button type="button" class="btn btn-primary btn-sm" data-action="preview" data-id="${a.id}"${canSimulate ? "" : " disabled"}>Controlla destinatari</button>
+              ${realSend && canSimulate ? `<button type="button" class="btn btn-primary btn-sm mkt-btn-send-real" data-action="send-real" data-id="${a.id}">Invia email</button>` : `<button type="button" class="btn btn-secondary btn-sm" data-action="simulate" data-id="${a.id}"${canSimulate ? "" : " disabled"}>Simula</button>`}
+            </div>
+            <div class="mkt-auto-secondary-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-action="edit" data-id="${a.id}">Modifica</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-action="duplicate" data-id="${a.id}">Duplica</button>
+              ${canSimulate ? `<button type="button" class="btn btn-ghost btn-sm" data-action="dry-run" data-id="${a.id}">Test</button>` : ""}
+              ${life === "archived" ? `<button type="button" class="btn btn-ghost btn-sm" data-action="unarchive" data-id="${a.id}">Ripristina</button>` : `<button type="button" class="btn btn-ghost btn-sm" data-action="archive" data-id="${a.id}">Archivia</button>`}
+              ${life === "active" ? `<button type="button" class="btn btn-ghost btn-sm" data-action="disable" data-id="${a.id}">Pausa</button>` : life === "disabled" ? `<button type="button" class="btn btn-ghost btn-sm" data-action="enable" data-id="${a.id}">Attiva</button>` : ""}
+              <button type="button" class="btn btn-ghost btn-sm mkt-btn-danger-text" data-action="delete" data-id="${a.id}">Elimina</button>
+            </div>
           </footer>
         </article>`;
       })
@@ -905,6 +1078,29 @@
     if ($("marketingSenderEmail")) {
       $("marketingSenderEmail").value = marketingConfig?.senderEmail || "";
     }
+    const senderEmail = (marketingConfig?.senderEmail || "").trim();
+    const senderDomain = getSenderDomain(senderEmail);
+    const senderIsGmail = isGmailAddress(senderEmail);
+    const senderVerification = getSenderVerification(senderEmail);
+    const senderCopy = getSenderStatusCopy(senderEmail, senderVerification);
+    const senderStatus = $("marketingSenderStatus");
+    const senderHint = $("marketingSenderHint");
+    const domainGuide = $("marketingDomainGuide");
+    const domainLabel = $("marketingSenderDomain");
+    if (senderStatus) {
+      senderStatus.dataset.tone = senderCopy.tone;
+      senderStatus.textContent = senderCopy.label;
+    }
+    if (senderHint) {
+      senderHint.textContent = senderCopy.hint;
+    }
+    if (domainGuide) {
+      domainGuide.hidden = !senderEmail || senderIsGmail || !senderDomain;
+    }
+    if (domainLabel) {
+      domainLabel.textContent = senderDomain || "il dominio";
+    }
+    renderDnsRecords(senderEmail, senderVerification);
     if ($("mktRealSendEnabled")) {
       $("mktRealSendEnabled").checked = !!marketingConfig?.realSendEnabled;
     }
@@ -1273,7 +1469,7 @@
       if (empty) empty.hidden = !noRows;
     } catch (e) {
       if (summary) {
-        summary.innerHTML = `<li class="mkt-recipient-stat"><span class="stat-label">Errore</span><span class="stat-value">${escapeHtml(e?.message || "Caricamento fallito")}</span></li>`;
+        summary.innerHTML = `<li class="mkt-recipient-stat"><span class="stat-label">Errore</span><span class="stat-value">${escapeHtml(userMessage(e, "Caricamento fallito"))}</span></li>`;
       }
     }
   }
@@ -1466,11 +1662,120 @@
     }
   }
 
+  function goToMarketingTab(tab) {
+    if (!tab) return;
+    setMarketingTab(tab);
+    if (tab === "automations") renderAutomationPanel();
+  }
+
+  function createAutomationFromDashboard() {
+    if (!marketingConfig?.enabled) {
+      openWizard();
+      return;
+    }
+    goToMarketingTab("automations");
+    openAutomationModal();
+  }
+
+  function handleDashboardAction(action) {
+    if (action === "create-automation") {
+      createAutomationFromDashboard();
+    } else if (action === "create-template") {
+      goToMarketingTab("templates");
+      openTemplateModal();
+    } else if (action === "simulate") {
+      openSimulatePicker();
+    } else if (action === "setup") {
+      if (marketingConfig?.enabled) goToMarketingTab("setup");
+      else openWizard();
+    }
+  }
+
+  async function saveSenderSettings() {
+    const senderEmail = $("marketingSenderEmail")?.value?.trim() || "";
+    await saveMarketing({ senderEmail, senderVerification: null });
+    if (!senderEmail) {
+      showFeedback($("marketingSenderFeedback"), "Mittente rimosso.", false);
+      renderBrandProfile();
+      return;
+    }
+    await refreshSenderVerification("prepare");
+  }
+
+  function buildDnsInstructions() {
+    const email = $("marketingSenderEmail")?.value?.trim() || marketingConfig?.senderEmail || "";
+    const domain = getSenderDomain(email);
+    if (!domain || isGmailAddress(email)) {
+      return "Per Gmail personale non servono record DNS: le risposte arriveranno alla Gmail impostata come Reply-To.";
+    }
+    const verification = getSenderVerification(email);
+    const records = (verification?.records || []).map(formatDnsRecord).filter(Boolean);
+    return [
+      `Dominio: ${domain}`,
+      "Record DNS da configurare:",
+      ...(records.length ? records : ["Clicca “Salva mittente” per generare SPF e DKIM."]),
+      `DMARC: TXT _dmarc.${domain} v=DMARC1; p=none;`,
+    ].join("\n");
+  }
+
+  async function refreshSenderVerification(action = "verify") {
+    const senderEmail = $("marketingSenderEmail")?.value?.trim() || marketingConfig?.senderEmail || "";
+    if (!senderEmail) {
+      showFeedback($("marketingSenderFeedback"), "Inserisci prima un indirizzo email mittente.", true);
+      return;
+    }
+
+    showFeedback(
+      $("marketingSenderFeedback"),
+      action === "verify" ? "Controllo verifica in corso..." : "Genero i record DNS...",
+      false
+    );
+
+    const result = await api()?.verifyMarketingSender?.({ senderEmail, action });
+    const verification = {
+      ...(result || {}),
+      senderEmail: senderEmail.toLowerCase(),
+      domain: result?.domain || getSenderDomain(senderEmail),
+      updatedAt: new Date().toISOString(),
+    };
+    await saveMarketing({
+      senderEmail,
+      senderVerification: verification,
+    });
+
+    showFeedback(
+      $("marketingSenderFeedback"),
+      userMessage(result?.message || verification.message, "Verifica mittente aggiornata."),
+      result?.ok === false
+    );
+    renderBrandProfile();
+  }
+
+  async function copyDnsInstructions() {
+    try {
+      await navigator.clipboard?.writeText(buildDnsInstructions());
+      showToast("Istruzioni DNS copiate.", { info: true });
+    } catch (_) {
+      showToast("Impossibile copiare automaticamente. Seleziona e copia i record DNS.", { error: true });
+    }
+  }
+
   async function bindEvents() {
+    document.querySelector('[data-view="marketing"]')?.addEventListener("click", (e) => {
+      const jump = e.target.closest("[data-mkt-jump]");
+      if (jump) {
+        goToMarketingTab(jump.dataset.mktJump);
+        return;
+      }
+      const action = e.target.closest("[data-mkt-action]");
+      if (action) {
+        handleDashboardAction(action.dataset.mktAction);
+      }
+    });
+
     document.querySelectorAll(".mkt-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
-        setMarketingTab(btn.dataset.marketingTab);
-        if (btn.dataset.marketingTab === "automations") renderAutomationPanel();
+        goToMarketingTab(btn.dataset.marketingTab);
       });
     });
 
@@ -1516,6 +1821,18 @@
     $("marketingWizardFinishBtn")?.addEventListener("click", finishWizard);
 
     $("marketingTemplateCloseBtn")?.addEventListener("click", closeTemplateModal);
+
+    $("marketingSaveSenderBtn")?.addEventListener("click", saveSenderSettings);
+    $("marketingCopyDnsBtn")?.addEventListener("click", copyDnsInstructions);
+    $("marketingCheckDomainBtn")?.addEventListener("click", () => refreshSenderVerification("verify"));
+    $("marketingSenderEmail")?.addEventListener("input", () => {
+      marketingConfig = {
+        ...(marketingConfig || {}),
+        senderEmail: $("marketingSenderEmail")?.value?.trim() || "",
+        senderVerification: null,
+      };
+      renderBrandProfile();
+    });
 
     $("marketingSaveBrandBtn")?.addEventListener("click", async () => {
       const businessProfile = collectBrandProfileFromForm();

@@ -1,10 +1,18 @@
 const { authorizeGoogle } = require("./auth");
-const { google } = require("googleapis");
 const { toClientMessage } = require("./errors");
 const { buildClearRange, buildUpdateRange } = require("./sheetRange");
 const { validateExcelFile, readWorkbookWithRetry, sheetToRows } = require("./excelUtils");
 const { applyColumnMapping, hasActiveMapping } = require("./columnMapping");
 const { normalizeRows } = require("./diffEngine");
+
+let cachedGoogleApi = null;
+
+function getGoogleApi() {
+  if (!cachedGoogleApi) {
+    cachedGoogleApi = require("googleapis").google;
+  }
+  return cachedGoogleApi;
+}
 
 function reportProgress(log, percent, message) {
   if (typeof log === "function") {
@@ -64,6 +72,7 @@ async function syncExcelToSheets(config, log = () => {}) {
     throw new Error(toClientMessage(error, "google"));
   }
 
+  const google = getGoogleApi();
   const sheets = google.sheets({ version: "v4", auth });
   const clearRange = buildClearRange(sheetName, columnCount);
   const updateRange = buildUpdateRange(sheetName, columnCount);

@@ -21,6 +21,7 @@ function getDefaultMarketingConfig() {
     enabled: false,
     senderName: "",
     senderEmail: "",
+    senderVerification: null,
     businessName: "",
     replyToEmail: "",
     requireMarketingConsent: true,
@@ -80,6 +81,33 @@ function normalizeFooterDisplay(raw) {
     vatNumber: !!d.vatNumber,
     social: d.social !== false,
     privacy: d.privacy !== false,
+  };
+}
+
+function normalizeSenderVerification(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const records = Array.isArray(raw.records)
+    ? raw.records.map((r) => ({
+        record: String(r?.record || "").trim(),
+        name: String(r?.name || "").trim(),
+        type: String(r?.type || "").trim(),
+        value: String(r?.value || "").trim(),
+        ttl: String(r?.ttl || "").trim(),
+        status: String(r?.status || "").trim(),
+        priority: r?.priority,
+      }))
+    : [];
+
+  return {
+    senderEmail: String(raw.senderEmail || "").trim().toLowerCase(),
+    domain: String(raw.domain || "").trim().toLowerCase(),
+    mode: String(raw.mode || "").trim(),
+    status: String(raw.status || "").trim(),
+    ok: raw.ok !== false,
+    verified: !!raw.verified,
+    message: String(raw.message || "").trim(),
+    records,
+    updatedAt: String(raw.updatedAt || "").trim(),
   };
 }
 
@@ -363,6 +391,7 @@ function normalizeMarketingConfig(raw) {
     enabled: !!cfg.enabled,
     senderName: businessProfile.senderName || String(cfg.senderName || "").trim(),
     senderEmail: String(cfg.senderEmail || "").trim(),
+    senderVerification: normalizeSenderVerification(cfg.senderVerification),
     businessName: businessProfile.businessName,
     replyToEmail: businessProfile.replyToEmail,
     businessProfile,

@@ -660,16 +660,17 @@
           <header class="mkt-hero card" aria-labelledby="mkt-hero-title">
             <div class="mkt-hero-top">
               <div class="mkt-hero-text">
+                <p class="mkt-eyebrow">Email marketing guidato</p>
                 <div class="mkt-hero-title-row">
-                  <h1 id="mkt-hero-title" class="mkt-hero-title">Marketing</h1>
+                  <h1 id="mkt-hero-title" class="mkt-hero-title">Marketing semplice per i tuoi clienti</h1>
                   <span id="marketingStatusBadge" class="mkt-status-badge" data-state="unconfigured">Non configurato</span>
                 </div>
-                <p class="mkt-hero-sub">Crea automazioni email usando i dati dei tuoi file Excel.</p>
+                <p class="mkt-hero-sub">Crea campagne email, controlla i destinatari e invia solo quando tutto è pronto.</p>
               </div>
               <div class="mkt-hero-actions view-header-actions">
-                <button type="button" id="marketingSetupBtn" class="btn btn-secondary">Configura Marketing</button>
-                <button type="button" id="marketingNewAutomationBtn" class="btn btn-secondary">Crea automazione</button>
-                <button type="button" id="marketingSimulateHeroBtn" class="btn btn-primary">Simula invio</button>
+                <button type="button" id="marketingSetupBtn" class="btn btn-secondary">Configura</button>
+                <button type="button" id="marketingNewAutomationBtn" class="btn btn-secondary">Nuova campagna</button>
+                <button type="button" id="marketingSimulateHeroBtn" class="btn btn-primary">Controlla destinatari</button>
               </div>
             </div>
             <div id="marketingSimBanner" class="mkt-sim-banner" role="note">
@@ -698,48 +699,103 @@
           </section>
 
           <div id="marketingMainContent" class="mkt-main" hidden>
-            <ul class="mkt-metrics health-stats-grid" aria-label="Metriche marketing">
-              <li class="mkt-metric-card">
-                <span class="stat-label">Automazioni attive</span>
-                <span id="marketingStatAutomations" class="stat-value">0</span>
-              </li>
-              <li class="mkt-metric-card">
-                <span class="stat-label">Destinatari previsti</span>
-                <span id="marketingStatRecipients" class="stat-value">0</span>
-              </li>
-              <li class="mkt-metric-card">
-                <span class="stat-label">Ultimo invio</span>
-                <span id="marketingStatLastSend" class="stat-value">—</span>
-              </li>
-              <li class="mkt-metric-card">
-                <span class="stat-label">Profilo dati collegato</span>
-                <span id="marketingStatProfile" class="stat-value mkt-stat-profile">—</span>
-              </li>
-            </ul>
-
             <nav class="mkt-tabs" role="tablist" aria-label="Sezioni marketing">
-              <button type="button" class="mkt-tab is-active" role="tab" data-marketing-tab="overview" aria-selected="true">Panoramica</button>
-              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="automations" aria-selected="false">Automazioni</button>
-              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="templates" aria-selected="false">Template</button>
-              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="setup" aria-selected="false">Configurazione</button>
-              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="history" aria-selected="false">Storico invii</button>
-              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="consent" aria-selected="false">Consensi</button>
+              <button type="button" class="mkt-tab is-active" role="tab" data-marketing-tab="overview" aria-selected="true">Home</button>
+              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="automations" aria-selected="false">Campagne</button>
+              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="templates" aria-selected="false">Email</button>
+              <button type="button" class="mkt-tab" role="tab" data-marketing-tab="setup" aria-selected="false">Impostazioni</button>
             </nav>
 
             <div class="mkt-panel" data-marketing-panel="overview">
-              <section class="card mkt-card">
-                <h2 class="sync-hero-title">Panoramica</h2>
-                <p class="sync-hero-desc">Riepilogo del profilo marketing e delle automazioni collegate ai dati Excel.</p>
-                <ul id="marketingOverviewList" class="mkt-overview-list"></ul>
-              </section>
+              <div class="mkt-dashboard">
+                <section class="card mkt-card mkt-dashboard-welcome">
+                  <div>
+                    <p class="mkt-section-kicker">Percorso guidato</p>
+                    <h2 class="sync-hero-title">Tre passi: clienti, email, invio</h2>
+                    <p id="marketingReadinessText" class="sync-hero-desc">Segui le card in ordine: scegli i clienti, prepara il messaggio e controlla prima di inviare.</p>
+                  </div>
+                  <div class="mkt-dashboard-primary-actions">
+                    <button type="button" class="btn btn-primary" data-mkt-action="simulate">Controlla e invia</button>
+                    <button type="button" class="btn btn-secondary" data-mkt-jump="setup">Impostazioni</button>
+                  </div>
+                </section>
+
+                <section class="mkt-client-flow" aria-label="Percorso marketing">
+                  <article id="marketingClientStepCard" class="card mkt-flow-card" data-step="clients">
+                    <div class="mkt-flow-num" aria-hidden="true">1</div>
+                    <div class="mkt-flow-body">
+                      <p class="mkt-section-kicker">Clienti</p>
+                      <h2>Scegli chi contattare</h2>
+                      <p id="marketingClientStepDesc">Collega il file Excel e verifica che email e consensi siano pronti.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-mkt-jump="setup">Controlla clienti</button>
+                  </article>
+
+                  <article id="marketingEmailStepCard" class="card mkt-flow-card" data-step="email">
+                    <div class="mkt-flow-num" aria-hidden="true">2</div>
+                    <div class="mkt-flow-body">
+                      <p class="mkt-section-kicker">Email</p>
+                      <h2>Prepara il messaggio</h2>
+                      <p id="marketingEmailStepDesc">Scegli un template pronto o scrivi una nuova email visuale.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-mkt-action="create-template">Prepara email</button>
+                  </article>
+
+                  <article id="marketingSendStepCard" class="card mkt-flow-card" data-step="send">
+                    <div class="mkt-flow-num" aria-hidden="true">3</div>
+                    <div class="mkt-flow-body">
+                      <p class="mkt-section-kicker">Invio</p>
+                      <h2>Controlla e invia</h2>
+                      <p id="marketingSendStepDesc">Vedi i destinatari, prova la campagna e invia solo quando sei sicuro.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary" data-mkt-action="simulate">Controlla destinatari</button>
+                  </article>
+                </section>
+
+                <ul class="mkt-metrics health-stats-grid" aria-label="Metriche marketing">
+                  <li class="mkt-metric-card">
+                    <span class="stat-label">Campagne attive</span>
+                    <span id="marketingStatAutomations" class="stat-value">0</span>
+                  </li>
+                  <li class="mkt-metric-card">
+                    <span class="stat-label">Da controllare oggi</span>
+                    <span id="marketingStatRecipients" class="stat-value">0</span>
+                  </li>
+                  <li class="mkt-metric-card">
+                    <span class="stat-label">Ultimo invio</span>
+                    <span id="marketingStatLastSend" class="stat-value">—</span>
+                  </li>
+                  <li class="mkt-metric-card">
+                    <span class="stat-label">Dati collegati</span>
+                    <span id="marketingStatProfile" class="stat-value mkt-stat-profile">—</span>
+                  </li>
+                </ul>
+
+                <section class="card mkt-card mkt-overview-card">
+                  <div class="mkt-card-head">
+                    <div>
+                      <p class="mkt-section-kicker">Riepilogo dati</p>
+                      <h2 class="sync-hero-title">Profilo collegato</h2>
+                      <p class="sync-hero-desc">Qui vedi quali dati Excel alimentano le campagne e quanto è completa la configurazione.</p>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="setup">Modifica impostazioni</button>
+                  </div>
+                  <ul id="marketingOverviewList" class="mkt-overview-list"></ul>
+                  <div class="mkt-secondary-actions" aria-label="Azioni secondarie marketing">
+                    <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="history">Storico invii</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="consent">Privacy e consensi</button>
+                  </div>
+                </section>
+              </div>
             </div>
 
             <div class="mkt-panel" data-marketing-panel="automations" hidden>
               <section id="marketingAutomationCategoriesView" class="card mkt-card">
                 <div class="mkt-card-head">
                   <div>
-                    <h2 class="sync-hero-title">Campagne marketing</h2>
-                    <p class="sync-hero-desc">Scegli una categoria per gestire le automazioni collegate ai dati Excel.</p>
+                    <p class="mkt-section-kicker">Campagne</p>
+                    <h2 class="sync-hero-title">Scegli il tipo di campagna</h2>
+                    <p class="sync-hero-desc">Parti da un obiettivo semplice: compleanno, punti fidelity, nuovi clienti o riattivazione.</p>
                   </div>
                 </div>
                 <div id="marketingAutoDraftBanner" class="mkt-draft-banner" hidden role="status">
@@ -765,7 +821,7 @@
                     <h2 id="marketingAutomationListTitle" class="sync-hero-title">—</h2>
                     <p id="marketingAutomationListDesc" class="sync-hero-desc">—</p>
                   </div>
-                  <button type="button" id="marketingAddAutomationBtn" class="btn btn-secondary btn-sm">Nuova automazione</button>
+                  <button type="button" id="marketingAddAutomationBtn" class="btn btn-primary btn-sm">Nuova campagna</button>
                 </div>
                 <div class="mkt-filter-bar" role="tablist" aria-label="Filtra automazioni">
                   <button type="button" class="mkt-filter-chip is-active" data-auto-filter="all">Tutte</button>
@@ -788,10 +844,11 @@
               <section class="card mkt-card">
                 <div class="mkt-card-head">
                   <div>
+                    <p class="mkt-section-kicker">Email</p>
                     <h2 class="sync-hero-title">Template email</h2>
-                    <p class="sync-hero-desc">Modelli riutilizzabili con variabili personalizzate.</p>
+                    <p class="sync-hero-desc">Prepara messaggi chiari usando blocchi visuali e variabili cliente.</p>
                   </div>
-                  <button type="button" id="marketingAddTemplateBtn" class="btn btn-secondary btn-sm">Nuovo template</button>
+                  <button type="button" id="marketingAddTemplateBtn" class="btn btn-primary btn-sm">Nuova email</button>
                 </div>
                 <div id="marketingTemplatesEmpty" class="mkt-inline-empty" hidden>
                   <p>Nessun template. Creane uno per le tue automazioni.</p>
@@ -804,6 +861,7 @@
 
             <div class="mkt-panel" data-marketing-panel="setup" hidden>
               <section class="card mkt-card mkt-setup-block">
+                <p class="mkt-section-kicker">Dati clienti</p>
                 <h2 class="sync-hero-title">Profilo dati sorgente</h2>
                 <p class="sync-hero-desc">Scegli quale sincronizzazione Excel alimenta il marketing.</p>
                 <div class="mkt-form-grid mkt-form-grid-2">
@@ -822,6 +880,7 @@
               </section>
 
               <section class="card mkt-card mkt-setup-block">
+                <p class="mkt-section-kicker">Colonne Excel</p>
                 <h2 class="sync-hero-title">Mapping colonne</h2>
                 <p class="sync-hero-desc">Collega ogni campo marketing alla colonna corrispondente nel file Excel.</p>
                 <div id="marketingMappingForm" class="mkt-mapping-grid"></div>
@@ -830,6 +889,7 @@
               </section>
 
               <section class="card mkt-card mkt-setup-block">
+                <p class="mkt-section-kicker">Brand e invio</p>
                 <h2 class="sync-hero-title">Dati azienda e brand</h2>
                 <p class="sync-hero-desc">Personalizza logo, colori e footer delle email marketing.</p>
                 <div class="mkt-form-grid mkt-form-grid-2">
@@ -866,7 +926,6 @@
                   <label class="check-item mkt-check"><input type="checkbox" id="mBrandShowSocial" checked /><span class="check-box" aria-hidden="true"></span><span class="check-text"><span class="check-title">Social</span></span></label>
                   <label class="check-item mkt-check"><input type="checkbox" id="mBrandShowPrivacy" checked /><span class="check-box" aria-hidden="true"></span><span class="check-text"><span class="check-title">Privacy</span></span></label>
                 </div>
-                <label class="mkt-field"><span class="field-label">Email mittente (invio reale)</span><input type="email" id="marketingSenderEmail" class="mkt-input" /></label>
                 <section class="mkt-real-send-settings">
                   <h3 class="mkt-subsection-title">Invio email reale</h3>
                   <label class="check-item mkt-check">
@@ -897,7 +956,11 @@
               <section class="card mkt-card mkt-setup-summary">
                 <h2 class="sync-hero-title">Riepilogo configurazione</h2>
                 <ul id="marketingSetupSummary" class="mkt-summary-list"></ul>
-                <button type="button" id="marketingReopenWizardBtn" class="btn btn-ghost btn-sm">Riapri configurazione guidata</button>
+                <div class="mkt-secondary-actions">
+                  <button type="button" id="marketingReopenWizardBtn" class="btn btn-ghost btn-sm">Riapri configurazione guidata</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="history">Storico invii</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="consent">Privacy e consensi</button>
+                </div>
               </section>
             </div>
 
@@ -905,10 +968,14 @@
               <section class="card mkt-card">
                 <div class="mkt-card-head">
                   <div>
+                    <p class="mkt-section-kicker">Registro attività</p>
                     <h2 class="sync-hero-title">Storico invii</h2>
                     <p class="sync-hero-desc">Registro locale di simulazioni e invii saltati.</p>
                   </div>
-                  <button type="button" id="marketingClearHistoryBtn" class="btn btn-ghost btn-sm">Pulisci storico</button>
+                  <div class="mkt-secondary-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="setup">Torna alle impostazioni</button>
+                    <button type="button" id="marketingClearHistoryBtn" class="btn btn-ghost btn-sm">Pulisci storico</button>
+                  </div>
                 </div>
                 <div id="marketingHistoryEmpty" class="mkt-inline-empty" hidden>
                   <p>Nessun invio simulato ancora. Usa <strong>Simula invio</strong> su un’automazione.</p>
@@ -932,7 +999,14 @@
 
             <div class="mkt-panel" data-marketing-panel="consent" hidden>
               <section class="card mkt-card">
-                <h2 class="sync-hero-title">Consensi marketing</h2>
+                <p class="mkt-section-kicker">Privacy</p>
+                <div class="mkt-card-head">
+                  <div>
+                    <h2 class="sync-hero-title">Consensi marketing</h2>
+                    <p class="sync-hero-desc">Gestisci le regole usate per escludere chi non ha dato consenso.</p>
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="setup">Torna alle impostazioni</button>
+                </div>
                 <aside class="mkt-consent-callout" role="note">
                   <span class="mkt-consent-callout-icon" aria-hidden="true">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 9v4m0 4h.01M10.3 4.3h3.4L20 12l-6.3 7.7h-3.4L4 12l6.3-7.7z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1070,6 +1144,76 @@
                   </button>
                   <button type="button" id="logoutBtn" class="btn btn-danger" hidden>Disconnetti Google</button>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-item" data-accordion-item id="accordion-email-sender">
+            <button type="button" class="accordion-trigger" aria-expanded="false" aria-controls="panel-email-sender" id="trigger-email-sender">
+              <span class="accordion-icon" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4V6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="accordion-text">
+                <span class="accordion-title">Mittente email</span>
+                <span class="accordion-desc">Dominio aziendale, Gmail e verifica DNS</span>
+              </span>
+              <span class="accordion-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="panel-email-sender" class="accordion-panel" role="region" aria-labelledby="trigger-email-sender">
+              <div class="accordion-body">
+                <section class="mkt-sender-settings mkt-sender-settings-flat" aria-labelledby="mkt-sender-title">
+                  <div class="mkt-sender-head">
+                    <div>
+                      <p class="mkt-section-kicker">Mittente</p>
+                      <h3 id="mkt-sender-title" class="mkt-subsection-title">Da quale email vuoi inviare?</h3>
+                      <p class="sync-hero-desc">Aven Labs invia per tuo conto con domini verificati. Ti guidiamo nella verifica del dominio prima dell’invio reale.</p>
+                    </div>
+                    <span id="marketingSenderStatus" class="mkt-pill" data-tone="muted">Da configurare</span>
+                  </div>
+
+                  <div class="mkt-sender-options">
+                    <article class="mkt-sender-option">
+                      <strong>Dominio aziendale</strong>
+                      <span>Es. info@negozio.it. Richiede verifica DNS SPF/DKIM per inviare con buona deliverability.</span>
+                    </article>
+                    <article class="mkt-sender-option">
+                      <strong>Gmail personale</strong>
+                      <span>Invio tramite mittente Aven verificato, con risposte indirizzate alla tua Gmail.</span>
+                    </article>
+                  </div>
+
+                  <label class="mkt-field">
+                    <span class="field-label">Email mittente desiderata</span>
+                    <input type="email" id="marketingSenderEmail" class="mkt-input" placeholder="info@tuodominio.it" />
+                    <p id="marketingSenderHint" class="field-hint">Inserisci l’indirizzo che vuoi mostrare nelle campagne.</p>
+                  </label>
+
+                  <div id="marketingDomainGuide" class="mkt-domain-guide" hidden>
+                    <div class="mkt-domain-guide-head">
+                      <div>
+                        <p class="mkt-section-kicker">Verifica dominio</p>
+                        <h4>Passi per verificare <span id="marketingSenderDomain">il dominio</span></h4>
+                      </div>
+                      <button type="button" id="marketingCheckDomainBtn" class="btn btn-secondary btn-sm">Controlla verifica</button>
+                    </div>
+                    <ol class="mkt-domain-steps">
+                      <li><strong>Apri il pannello DNS</strong><span>Accedi al provider del dominio (Aruba, Register, GoDaddy, Cloudflare, ecc.).</span></li>
+                      <li><strong>Aggiungi i record richiesti</strong><span>Clicca “Salva mittente” per generare SPF e DKIM, poi copiali nel DNS.</span></li>
+                      <li><strong>Torna qui e controlla</strong><span>Quando i DNS sono propagati, il dominio diventa “Verificato”.</span></li>
+                    </ol>
+                    <div class="mkt-dns-records" aria-label="Record DNS da configurare">
+                      <div class="mkt-dns-record"><span>SPF</span><code id="marketingDnsSpf">Clicca “Salva mittente” per generare i record.</code></div>
+                      <div class="mkt-dns-record"><span>DKIM</span><code id="marketingDnsDkim">Clicca “Salva mittente” per generare i record.</code></div>
+                      <div class="mkt-dns-record"><span>DMARC</span><code id="marketingDnsDmarc">v=DMARC1; p=none;</code></div>
+                    </div>
+                  </div>
+
+                  <p id="marketingSenderFeedback" class="mkt-form-feedback" hidden role="status"></p>
+                  <div class="mkt-secondary-actions">
+                    <button type="button" id="marketingSaveSenderBtn" class="btn btn-primary">Salva mittente</button>
+                    <button type="button" id="marketingCopyDnsBtn" class="btn btn-ghost btn-sm">Copia istruzioni DNS</button>
+                  </div>
+                </section>
               </div>
             </div>
           </div>

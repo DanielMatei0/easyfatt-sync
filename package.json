@@ -4,7 +4,7 @@
   "description": "Easyfatt Sync — Aven Labs (Excel → Google Sheets)",
   "main": "main.js",
   "scripts": {
-    "dev": "electron .",
+    "dev": "node scripts/start-dev.js",
     "dist:win": "electron-builder --win nsis --x64",
     "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --arm64",
     "dist:mac:intel": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --x64",
@@ -35,6 +35,15 @@
       "!**/*.log"
     ],
     "asar": true,
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "win": {
       "target": [
         {

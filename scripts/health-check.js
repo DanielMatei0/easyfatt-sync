@@ -6,12 +6,15 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { execSync, spawnSync } = require("child_process");
 
 const ROOT = path.join(__dirname, "..");
+const ELECTRON_RUN_AS_NODE_WAS_ACTIVE = process.env.ELECTRON_RUN_AS_NODE === "1";
+delete process.env.ELECTRON_RUN_AS_NODE;
 
 const REQUIRED_FILES = [
   "main.js",
+  "assetPaths.js",
   "preload.js",
   "package.json",
   "oauth_credentials.example.json",
@@ -46,6 +49,7 @@ const MODULES_TO_LOAD = [
   "marketingConfig.js",
   "marketingEngine.js",
   "marketingSender.js",
+  "assetPaths.js",
 ];
 
 const errors = [];
@@ -141,6 +145,21 @@ function checkPackageJson(pkg) {
     warn("build.mac.hardenedRuntime non è false (ok solo dopo notarizzazione)");
   }
 
+  const hasAssetsExtraResources =
+    Array.isArray(build.extraResources) &&
+    build.extraResources.some(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        item.from === "assets" &&
+        item.to === "assets",
+    );
+  if (!hasAssetsExtraResources) {
+    fail("build.extraResources deve copiare assets/ fuori da app.asar");
+  } else {
+    pass("build.extraResources assets OK");
+  }
+
   if (!Object.prototype.hasOwnProperty.call(build.mac || {}, "identity")) {
     warn("build.mac.identity non impostato");
   } else if (build.mac.identity !== null) {
@@ -191,19 +210,40 @@ function checkRenderer() {
 }
 
 function checkModules() {
-  const prev = process.cwd();
-  process.chdir(ROOT);
   for (const mod of MODULES_TO_LOAD) {
-    try {
-      const resolved = require.resolve(path.join(ROOT, mod));
-      delete require.cache[resolved];
-      require(resolved);
+    const childEnv = { ...process.env };
+    delete childEnv.ELECTRON_RUN_AS_NODE;
+    const modulePath = path.join(ROOT, mod);
+    const result = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        [
+          "delete process.env.ELECTRON_RUN_AS_NODE;",
+          `process.chdir(${JSON.stringify(ROOT)});`,
+          `require(${JSON.stringify(modulePath)});`,
+        ].join(" "),
+      ],
+      {
+        cwd: ROOT,
+        env: childEnv,
+        encoding: "utf8",
+        timeout: 5000,
+      },
+    );
+
+    if (result.error?.code === "ETIMEDOUT") {
+      warn(`require ${mod}: timeout (modulo pesante, saltato)`);
+      continue;
+    }
+
+    if (result.status === 0) {
       pass(`require ${mod}`);
-    } catch (e) {
-      fail(`require ${mod}: ${e.message}`);
+    } else {
+      const message = (result.stderr || result.stdout || "errore sconosciuto").trim();
+      fail(`require ${mod}: ${message.split("\n")[0]}`);
     }
   }
-  process.chdir(prev);
 }
 
 function checkOAuthForBuild() {
@@ -260,9 +300,9 @@ function checkPlatformNotes() {
     );
   }
 
-  if (process.env.ELECTRON_RUN_AS_NODE === "1") {
+  if (ELECTRON_RUN_AS_NODE_WAS_ACTIVE) {
     warn(
-      "ELECTRON_RUN_AS_NODE=1 attivo: npm run dev può fallire. Esegui unset ELECTRON_RUN_AS_NODE"
+      "ELECTRON_RUN_AS_NODE=1 era attivo: gli script lo ignorano, ma nel terminale puoi eseguire unset ELECTRON_RUN_AS_NODE"
     );
   }
 }

@@ -27,7 +27,6 @@ const fs = require("fs");
 const http = require("http");
 const net = require("net");
 const path = require("path");
-const { google } = require("googleapis");
 const { shell } = require("electron");
 
 const CREDENTIALS_PATH = path.join(__dirname, "oauth_credentials.json");
@@ -38,6 +37,14 @@ let activeOAuthServer = null;
 let activeOAuthTimeout = null;
 let cachedAuthClient = null;
 let cachedTokenMtime = null;
+let cachedGoogleApi = null;
+
+function getGoogleApi() {
+  if (!cachedGoogleApi) {
+    cachedGoogleApi = require("googleapis").google;
+  }
+  return cachedGoogleApi;
+}
 
 function appDataPath() {
   const base = process.env.APPDATA || process.env.HOME || __dirname;
@@ -72,6 +79,7 @@ function loadOAuthCredentials() {
 }
 
 function createOAuthClient(redirectUri) {
+  const google = getGoogleApi();
   const { client_secret, client_id } = loadOAuthCredentials();
   return new google.auth.OAuth2(client_id, client_secret, redirectUri);
 }

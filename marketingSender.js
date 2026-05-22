@@ -1,5 +1,11 @@
 const { MARKETING_API_URL, MARKETING_MAX_BATCH_SIZE } = require("./marketingConstants");
 
+function getSenderApiUrl(marketingApiUrl) {
+  const sendUrl = String(marketingApiUrl || MARKETING_API_URL).trim() || MARKETING_API_URL;
+  if (/\/send\/?$/i.test(sendUrl)) return sendUrl.replace(/\/send\/?$/i, "/sender");
+  return `${sendUrl.replace(/\/+$/g, "")}/sender`;
+}
+
 /**
  * Invio batch email marketing verso API Aven Labs.
  * Nessuna API key nell'app — solo payload destinatari + template.
@@ -85,7 +91,48 @@ async function sendMarketingBatch(options = {}) {
   }
 }
 
+async function verifyMarketingSender(options = {}) {
+  const { marketingApiUrl, senderEmail, action = "prepare" } = options;
+  const email = String(senderEmail || "").trim().toLowerCase();
+  if (!email) {
+    return { ok: false, message: "Inserisci un indirizzo email mittente." };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const response = await fetch(getSenderApiUrl(marketingApiUrl), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ senderEmail: email, action }),
+      signal: controller.signal,
+    });
+
+    const data = await response.json().catch(() => ({}));
+    return {
+      ok: response.ok && data.ok !== false,
+      ...data,
+      message:
+        data.message ||
+        (response.ok
+          ? "Verifica mittente aggiornata."
+          : `Errore verifica mittente (${response.status})`),
+    };
+  } catch (error) {
+    const message =
+      error.name === "AbortError"
+        ? "Timeout durante la verifica del mittente."
+        : error.message || "Errore di rete durante la verifica del mittente.";
+    return { ok: false, status: "network_error", message, records: [] };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 module.exports = {
   sendMarketingBatch,
+  verifyMarketingSender,
+  getSenderApiUrl,
   MARKETING_MAX_BATCH_SIZE,
 };

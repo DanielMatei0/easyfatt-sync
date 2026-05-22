@@ -19,12 +19,6 @@ const {
   validateSyncProfiles,
 } = require("./syncState");
 const { LEGAL_VERSION } = require("./legalConstants");
-const {
-  initAutoUpdater,
-  checkForUpdates,
-  downloadUpdate,
-  installUpdateNow,
-} = require("./updater");
 const { submitSupportRequest, getPlatformLabel } = require("./support");
 const { applyOpenAtLoginSetting } = require("./loginSettings");
 const {
@@ -62,12 +56,14 @@ const {
   executeAutomationSend,
   dryRunAutomationSend,
 } = require("./marketingEngine");
-const { sendMarketingBatch } = require("./marketingSender");
+const { sendMarketingBatch, verifyMarketingSender } = require("./marketingSender");
 const pkgVersion = require("./package.json").version;
 const fs = require("fs");
 const os = require("os");
+const { getWindowIconPath, applyDockIcon } = require("./assetPaths");
 
 const MARKETING_ASSETS_DIR = "marketing-assets";
+const DEV_UPDATE_MESSAGE = "Aggiornamenti disponibili solo nella versione installata.";
 
 function getMarketingAssetsDir() {
   const dir = path.join(app.getPath("userData"), MARKETING_ASSETS_DIR);
@@ -92,9 +88,12 @@ function readLogoDataUrl(logoPath) {
 const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 
 const store = new Store();
-const APP_ICON_PATH = path.join(__dirname, "assets", "icon.png");
 
 let mainWindow;
+
+function getUpdater() {
+  return require("./updater");
+}
 
 function sendHistoryUpdated() {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -108,13 +107,67 @@ function sendMarketingUpdated() {
   }
 }
 
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  try {
+    mainWindow.center();
+  } catch {
+    /* ignore */
+  }
+
+  if (process.platform === "darwin") {
+    try {
+      mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  mainWindow.show();
+  if (typeof mainWindow.moveTop === "function") {
+    mainWindow.moveTop();
+  }
+  mainWindow.setAlwaysOnTop(true, "floating");
+  mainWindow.focus();
+  if (process.platform === "darwin") {
+    app.focus({ steal: true });
+  }
+
+  const focusFallback = setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+    mainWindow.setAlwaysOnTop(false);
+    if (process.platform === "darwin") {
+      try {
+        mainWindow.setVisibleOnAllWorkspaces(false);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, 800);
+  if (typeof focusFallback.unref === "function") {
+    focusFallback.unref();
+  }
+}
+
 function createWindow() {
+  const windowIcon = getWindowIconPath();
+  console.log("[Easyfatt Sync] Creo la finestra principale...");
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    icon: APP_ICON_PATH,
+    show: false,
+    ...(windowIcon ? { icon: windowIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -123,10 +176,37 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
+  mainWindow.once("ready-to-show", () => {
+    console.log("[Easyfatt Sync] Finestra pronta, la porto in primo piano.");
+    showMainWindow();
+  });
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+  mainWindow.webContents.once("did-finish-load", () => {
+    console.log("[Easyfatt Sync] Renderer caricato.");
+  });
+  mainWindow.webContents.on("did-fail-load", (_event, code, description) => {
+    console.error(`[Easyfatt Sync] Caricamento finestra fallito (${code}): ${description}`);
+    showMainWindow();
+  });
+
+  mainWindow.loadFile(path.join(__dirname, "renderer", "index.html")).catch((error) => {
+    console.error(
+      `[Easyfatt Sync] Impossibile caricare renderer: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    showMainWindow();
+  });
+
+  const showFallback = setTimeout(showMainWindow, 1500);
+  if (typeof showFallback.unref === "function") {
+    showFallback.unref();
+  }
 
   if (app.isPackaged) {
-    initAutoUpdater(mainWindow);
+    getUpdater().initAutoUpdater(mainWindow);
   }
 }
 
@@ -155,10 +235,43 @@ function scheduleStartupUpdateCheck() {
   if (!app.isPackaged) return;
 
   setTimeout(() => {
-    checkForUpdates().catch((error) => {
+    checkForUpdatesSafe().catch((error) => {
       sendLog(`Controllo aggiornamenti non riuscito: ${toClientMessage(error)}`);
     });
   }, AUTO_UPDATE_CHECK_DELAY_MS);
+}
+
+function emitDevUpdateState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update-state", {
+      state: "dev",
+      message: DEV_UPDATE_MESSAGE,
+    });
+  }
+}
+
+async function checkForUpdatesSafe() {
+  if (!app.isPackaged) {
+    emitDevUpdateState();
+    return { ok: false, message: DEV_UPDATE_MESSAGE };
+  }
+  return getUpdater().checkForUpdates();
+}
+
+async function downloadUpdateSafe() {
+  if (!app.isPackaged) {
+    emitDevUpdateState();
+    return { ok: false, message: DEV_UPDATE_MESSAGE };
+  }
+  return getUpdater().downloadUpdate();
+}
+
+function installUpdateNowSafe() {
+  if (!app.isPackaged) {
+    emitDevUpdateState();
+    return { ok: false, message: DEV_UPDATE_MESSAGE };
+  }
+  return getUpdater().installUpdateNow();
 }
 
 setPostMarketingHook(() => {
@@ -166,9 +279,8 @@ setPostMarketingHook(() => {
 });
 
 app.whenReady().then(() => {
-  if (process.platform === "darwin" && app.dock) {
-    app.dock.setIcon(APP_ICON_PATH);
-  }
+  console.log("[Easyfatt Sync] Electron pronto.");
+  applyDockIcon();
 
   createWindow();
   const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
@@ -185,6 +297,14 @@ app.on("before-quit", () => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+  } else {
+    showMainWindow();
   }
 });
 
@@ -349,15 +469,15 @@ ipcMain.handle("get-app-version", () => {
 });
 
 ipcMain.handle("check-for-updates", async () => {
-  return checkForUpdates();
+  return checkForUpdatesSafe();
 });
 
 ipcMain.handle("download-update", async () => {
-  return downloadUpdate();
+  return downloadUpdateSafe();
 });
 
 ipcMain.handle("install-update-now", () => {
-  return installUpdateNow();
+  return installUpdateNowSafe();
 });
 
 ipcMain.handle("submit-support-request", async (_, form) => {
@@ -704,6 +824,15 @@ ipcMain.handle("send-marketing-batch", async (_, payload) => {
     payload,
     dryRun: !!payload?.metadata?.dryRun,
     realSendEnabled: marketing.realSendEnabled,
+  });
+});
+
+ipcMain.handle("verify-marketing-sender", async (_, payload) => {
+  const marketing = getMarketingConfig(store);
+  return verifyMarketingSender({
+    marketingApiUrl: marketing.marketingApiUrl,
+    senderEmail: payload?.senderEmail || marketing.senderEmail,
+    action: payload?.action || "prepare",
   });
 });
 

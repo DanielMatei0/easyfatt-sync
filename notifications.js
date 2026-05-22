@@ -1,4 +1,5 @@
 const APP_TITLE = "Easyfatt Sync";
+const { getNotificationIconPath } = require("./assetPaths");
 
 function getNotificationApi() {
   const electron = require("electron");
@@ -19,11 +20,17 @@ function showNotification({ title, body }) {
     return false;
   }
 
-  const notification = new Notification({
+  const options = {
     title,
     body,
     silent: false,
-  });
+  };
+  const iconPath = getNotificationIconPath();
+  if (iconPath) {
+    options.icon = iconPath;
+  }
+
+  const notification = new Notification(options);
 
   notification.show();
   return true;
