@@ -93,9 +93,32 @@ const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 const store = new Store();
 
 let mainWindow;
+let isQuittingForUpdate = false;
 
 function getUpdater() {
   return require("./src/main/updater");
+}
+
+function stopSchedulerSafely(reason) {
+  try {
+    if (typeof stopScheduler === "function") {
+      stopScheduler();
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Easyfatt Sync] stopScheduler fallito (${reason}): ${message}`);
+  }
+}
+
+function prepareForUpdateInstall() {
+  if (isQuittingForUpdate) {
+    return;
+  }
+
+  isQuittingForUpdate = true;
+  console.log("[Easyfatt Sync] Uscita per installazione aggiornamento.");
+  sendLog("Preparazione riavvio per installare l'aggiornamento...");
+  stopSchedulerSafely("update");
 }
 
 function sendHistoryUpdated() {
@@ -274,7 +297,13 @@ function installUpdateNowSafe() {
     emitDevUpdateState();
     return { ok: false, message: DEV_UPDATE_MESSAGE };
   }
-  return getUpdater().installUpdateNow();
+  const updater = getUpdater();
+  if (typeof updater.isUpdateReady === "function" && !updater.isUpdateReady()) {
+    return updater.installUpdateNow();
+  }
+  return updater.installUpdateNow({
+    beforeQuitAndInstall: prepareForUpdateInstall,
+  });
 }
 
 setPostMarketingHook(() => {
@@ -294,16 +323,25 @@ app.whenReady().then(() => {
 });
 
 app.on("before-quit", () => {
-  stopScheduler();
+  if (isQuittingForUpdate) {
+    return;
+  }
+  stopSchedulerSafely("before-quit");
 });
 
 app.on("window-all-closed", () => {
+  if (isQuittingForUpdate) {
+    return;
+  }
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
 app.on("activate", () => {
+  if (isQuittingForUpdate) {
+    return;
+  }
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow();
   } else {

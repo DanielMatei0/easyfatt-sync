@@ -1,6 +1,6 @@
 {
   "name": "easyfatt-sync-app",
-  "version": "26.1.0",
+  "version": "26.1.1",
   "description": "Easyfatt Sync — Aven Labs (Excel → Google Sheets)",
   "main": "main.js",
   "scripts": {
@@ -57,17 +57,14 @@
       "artifactName": "Easyfatt-Sync-Windows.${ext}"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
       "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Easyfatt Sync",
       "uninstallDisplayName": "Easyfatt Sync",
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
       "deleteAppDataOnUninstall": false
     },
     "mac": {

@@ -387,7 +387,7 @@ Configurazione builder in `package.json` → sezione `"build"`:
 
 - `appId`: `com.avenlabs.easyfattsync`
 - `productName`: `Easyfatt Sync`
-- Windows: target **NSIS** (`oneClick: false`, scelta cartella, shortcut Desktop/Start, `assets/icon.ico`)
+- Windows: target **NSIS one-click** (`oneClick: true`, installazione per utente, shortcut Desktop/Start, `assets/icon.ico`)
 - macOS: **DMG** con `assets/icon.icns`, `hardenedRuntime: false` (test); notarizzazione documentata in [macos-notarization-future.md](./macos-notarization-future.md)
 - `publish`: GitHub `DanielMatei0/easyfatt-sync`
 - `oauth_credentials.json`: incluso nel pacchetto se presente in root al build; **mai** in Git (`oauth_credentials.example.json` resta nel repo)
@@ -956,6 +956,7 @@ Ogni voce richiede ADR, aggiornamento `backupVersion` se cambia schema, e revisi
 | “Solo versione installata” | `npm run dev`                    | Testare su build packaged                    |
 | Update non trovato         | `latest.yml` mancante in release | Allegare YAML alla GitHub Release            |
 | Download fallito           | Rete / proxy aziendale           | Log `electron-log`, test manuale URL release |
+| Download OK, install non parte | Cache updater corrotta o installer NSIS assistito | Chiudere app, cancellare `%LOCALAPPDATA%\easyfatt-sync-app-updater`, verificare `oneClick: true` |
 
 
 ### Build

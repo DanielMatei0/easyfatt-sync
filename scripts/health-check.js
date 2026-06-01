@@ -126,10 +126,22 @@ function checkPackageJson(pkg) {
   }
 
   const nsis = build.nsis;
-  if (!nsis || nsis.oneClick !== false) {
-    fail("build.nsis.oneClick deve essere false");
+  if (!nsis || nsis.oneClick !== true) {
+    fail("build.nsis.oneClick deve essere true per auto-update silent");
   } else {
-    pass("build.nsis (wizard) OK");
+    pass("build.nsis oneClick OK");
+  }
+
+  if (nsis?.perMachine !== false) {
+    fail("build.nsis.perMachine deve essere false");
+  } else {
+    pass("build.nsis per-user OK");
+  }
+
+  if (nsis?.allowToChangeInstallationDirectory !== false) {
+    fail("build.nsis.allowToChangeInstallationDirectory deve essere false");
+  } else {
+    pass("build.nsis install dir fisso OK");
   }
 
   if (build.mac?.icon !== "assets/icon.icns") {

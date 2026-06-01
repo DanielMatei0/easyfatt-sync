@@ -30,7 +30,7 @@ Risultato tipico nella cartella `dist/`:
 
 | File | Uso |
 |------|-----|
-| `Easyfatt-Sync-Windows.exe` | Installer per i clienti (setup guidato NSIS) — **nome stabile** |
+| `Easyfatt-Sync-Windows.exe` | Installer per i clienti (NSIS one-click) — **nome stabile** |
 | `latest.yml` | Metadati per **electron-updater** (non per download manuale) |
 | `Easyfatt-Sync-Windows.exe.blockmap` | Delta update (solo auto-update) |
 | Cartella `win-unpacked/` | App “portable” non installata (utile per debug) |
@@ -49,7 +49,7 @@ Link sito (ultima release GitHub):
 Vedi anche [release-assets.md](./release-assets.md).
 
 - **Architettura:** solo **64 bit** (`x64`).
-- **Formato installer:** **NSIS** con wizard (non one-click): scelta cartella, collegamento Desktop, menu Start, icona `assets/icon.ico`.
+- **Formato installer:** **NSIS one-click** per compatibilità con auto-update silent di `electron-updater`; installazione per utente, collegamenti Desktop/menu Start, icona `assets/icon.ico`.
 
 ---
 
@@ -216,7 +216,7 @@ Senza `latest.yml` sulla release, l’app installata non rileverà correttamente
 Checklist consigliata su un PC Windows pulito (o VM):
 
 1. Esegui `Easyfatt-Sync-Windows.exe`.
-2. Completa il wizard NSIS: scegli cartella, conferma collegamento **Desktop** e **menu Start** (entrambi abilitati in `package.json` → `build.nsis`).
+2. Attendi il completamento dell’installer NSIS one-click; i collegamenti **Desktop** e **menu Start** sono creati dalla configurazione `package.json` → `build.nsis`.
 3. Avvia **Easyfatt Sync** dal menu Start.
 4. Accetta **Privacy e Termini** al primo avvio.
 5. **Collega Google** e completa OAuth nel browser.
@@ -323,6 +323,23 @@ Normale senza firma digitale. Vedi [§8](#8-firma-del-codice-consigliata).
 - `version` nella release coerente con il tag.
 - `build.publish` in `package.json` con owner/repo corretti.
 - Cliente usa installer ufficiale, non `npm run dev`.
+
+---
+
+### Update scaricato ma non installato su Windows
+
+Se `electron-updater` scarica correttamente l’update ma `quitAndInstall` non completa l’installazione:
+
+1. Chiudi Easyfatt Sync.
+2. Cancella la cache update:
+
+```text
+%LOCALAPPDATA%\easyfatt-sync-app-updater
+```
+
+3. Riavvia Easyfatt Sync e riprova **Controlla aggiornamenti**.
+
+Verifica anche che la release usi un installer NSIS `oneClick: true`; installer assistiti (`oneClick: false`) possono rompere l’installazione silent con `--updated`.
 
 ---
 

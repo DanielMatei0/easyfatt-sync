@@ -194,7 +194,8 @@ async function downloadUpdate() {
   return { ok: true };
 }
 
-function installUpdateNow() {
+function installUpdateNow(options = {}) {
+  log.info("installUpdateNow called");
   const autoUpdater = getAutoUpdater();
 
   if (!autoUpdater) {
@@ -215,7 +216,17 @@ function installUpdateNow() {
     message: "Installazione aggiornamento in corso...",
   });
 
+  if (typeof options.beforeQuitAndInstall === "function") {
+    try {
+      options.beforeQuitAndInstall();
+    } catch (error) {
+      log.warn("Preparazione uscita per aggiornamento non riuscita:", error);
+    }
+  }
+
+  log.info("app will quit for update");
   setImmediate(() => {
+    log.info("quitAndInstall called");
     autoUpdater.quitAndInstall(false, true);
   });
 
