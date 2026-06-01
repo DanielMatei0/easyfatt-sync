@@ -52,3 +52,8 @@ backend-examples/**/.env.local
 # Safe templates (committed)
 # oauth_credentials.example.json
 # .env.example
+
+# macOS resource fork files
+._*
+**/._*
+.DS_Store
