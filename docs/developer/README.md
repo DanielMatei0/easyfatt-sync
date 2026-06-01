@@ -253,6 +253,7 @@ easyfatt-sync-app/
 │       ├── marketingConfig.js
 │       ├── marketingEngine.js
 │       ├── marketingSender.js
+│       ├── gmailMarketingSender.js
 │       └── emailTemplateRenderer.js
 ├── marketing-api/          # Next.js App Router — POST …/easyfatt-sync/send
 ├── package.json            # Scripts, electron-builder, publish (version: 26.0.0)
@@ -301,6 +302,7 @@ easyfatt-sync-app/
 | `src/main/marketingConfig.js`   | Normalizzazione `marketingConfig`, storico invii, seed template |
 | `src/main/marketingEngine.js`   | Excel → clienti, regole automazione, simulazione               |
 | `src/main/marketingSender.js`   | POST verso `marketingApiUrl` (dry-run o invio reale)           |
+| `src/main/gmailMarketingSender.js` | Invio tramite Gmail API per mittenti `@gmail.com`            |
 | `src/main/emailTemplateRenderer.js` | Compilazione template a blocchi in HTML inline              |
 | `src/main/updater.js`           | Check/download/install release GitHub                          |
 | `src/main/support.js`           | Validazione form + fetch API                                    |
@@ -426,9 +428,10 @@ File **non** committare (vedi `.gitignore`):
 
 ```text
 https://www.googleapis.com/auth/spreadsheets
+https://www.googleapis.com/auth/gmail.send
 ```
 
-Accesso in lettura/scrittura ai fogli dell’account collegato.
+Accesso in lettura/scrittura ai fogli dell’account collegato e invio email Gmail per il marketing quando il mittente è `@gmail.com`.
 
 ### File credenziali
 
@@ -693,10 +696,11 @@ Modulo **additivo**: non modifica `sync.js` né i flussi OAuth/sync esistenti.
 renderer/marketing-ui.js
   → preload IPC
   → marketingEngine.js (Excel → destinatari idonei, anti-duplicati)
-  → marketingSender.js → POST marketing-api (Resend)
+  ├→ marketingSender.js → POST marketing-api (Resend, domini aziendali)
+  └→ gmailMarketingSender.js → Gmail API (mittenti @gmail.com)
 ```
 
-**Sicurezza app:** non invia token Google, file Excel completo né API key Resend. Solo destinatari necessari (max **50** per batch).
+**Sicurezza app:** per Resend non invia token Google, file Excel completo né API key Resend. Per Gmail usa il token OAuth locale già salvato per l’account Google collegato. Solo destinatari necessari (max **50** per batch).
 
 ### IPC principali
 

@@ -51,6 +51,7 @@ const MODULES_TO_LOAD = [
   "src/main/marketingConfig.js",
   "src/main/marketingEngine.js",
   "src/main/marketingSender.js",
+  "src/main/gmailMarketingSender.js",
   "src/main/assetPaths.js",
 ];
 

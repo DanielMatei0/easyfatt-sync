@@ -245,12 +245,13 @@
       };
     }
     if (isGmailAddress(senderEmail)) {
+      const needsReconnect = verification?.status === "needs_google_reconnect";
       return {
-        tone: "accent",
-        label: "Gmail come risposta",
+        tone: needsReconnect ? "danger" : "success",
+        label: needsReconnect ? "Permesso Gmail mancante" : "Gmail diretto",
         hint:
           verification?.message ||
-          "Per Gmail personale useremo un mittente Aven verificato e imposteremo questa email come Reply-To.",
+          "Invieremo direttamente dall’account Gmail collegato all’app tramite Google.",
       };
     }
     if (verification?.verified || verification?.status === "verified") {
@@ -1756,6 +1757,10 @@
         renderBrandProfile();
         return;
       }
+      if (isGmailAddress(senderEmail)) {
+        await configureGmailSender(senderEmail);
+        return;
+      }
       await refreshSenderVerification("prepare");
     } catch (error) {
       showFeedback(
@@ -1772,7 +1777,7 @@
     const email = $("marketingSenderEmail")?.value?.trim() || marketingConfig?.senderEmail || "";
     const domain = getSenderDomain(email);
     if (!domain || isGmailAddress(email)) {
-      return "Per Gmail personale non servono record DNS: le risposte arriveranno alla Gmail impostata come Reply-To.";
+      return "Per Gmail personale non servono record DNS: l'invio avviene dall'account Google collegato tramite Gmail API.";
     }
     const verification = getSenderVerification(email);
     const records = (verification?.records || []).map(formatDnsRecord).filter(Boolean);
@@ -1782,6 +1787,37 @@
       ...(records.length ? records : ["Clicca “Salva mittente” per generare SPF e DKIM."]),
       `DMARC: TXT _dmarc.${domain} v=DMARC1; p=none;`,
     ].join("\n");
+  }
+
+  async function configureGmailSender(senderEmail) {
+    const googleStatus = await api()?.isGoogleAuthorized?.();
+    const authorized = !!googleStatus?.authorized;
+    const gmailSendAuthorized = !!googleStatus?.gmailSendAuthorized;
+    const verification = {
+      ok: authorized && gmailSendAuthorized,
+      senderEmail: senderEmail.toLowerCase(),
+      domain: getSenderDomain(senderEmail),
+      mode: "gmail_api",
+      status: !authorized
+        ? "google_not_connected"
+        : gmailSendAuthorized
+          ? "gmail_ready"
+          : "needs_google_reconnect",
+      verified: authorized && gmailSendAuthorized,
+      message: !authorized
+        ? "Collega Google per inviare email da Gmail."
+        : gmailSendAuthorized
+          ? "Gmail configurata: le campagne verranno inviate dall’account Google collegato."
+          : "Ricollega Google e accetta il nuovo permesso di invio email Gmail.",
+      records: [],
+      updatedAt: new Date().toISOString(),
+    };
+    await saveMarketing({
+      senderEmail,
+      senderVerification: verification,
+    });
+    showFeedback($("marketingSenderFeedback"), verification.message, !verification.ok);
+    renderBrandProfile();
   }
 
   async function refreshSenderVerification(action = "verify") {

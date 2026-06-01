@@ -10,6 +10,7 @@ const {
 } = require("./marketingConfig");
 const { MARKETING_MAX_BATCH_SIZE } = require("./marketingConstants");
 const { sendMarketingBatch } = require("./marketingSender");
+const { sendGmailMarketingBatch, isGmailAddress } = require("./gmailMarketingSender");
 const { buildVariableMap, getBusinessProfile } = require("./emailTemplateRenderer");
 
 function parseDate(value) {
@@ -693,12 +694,20 @@ async function executeAutomationSend(store, appConfig, automationId, options = {
     dryRun,
   });
 
-  const sendResult = await sendMarketingBatch({
-    marketingApiUrl: marketing.marketingApiUrl,
-    payload,
-    dryRun,
-    realSendEnabled: marketing.realSendEnabled,
-  });
+  const senderEmail = String(marketing.senderEmail || "").trim().toLowerCase();
+  const useGmail = isGmailAddress(senderEmail);
+  const sendResult = useGmail
+    ? await sendGmailMarketingBatch({
+        payload,
+        dryRun,
+        realSendEnabled: marketing.realSendEnabled,
+      })
+    : await sendMarketingBatch({
+        marketingApiUrl: marketing.marketingApiUrl,
+        payload,
+        dryRun,
+        realSendEnabled: marketing.realSendEnabled,
+      });
 
   if (!sendResult.ok) {
     throw new Error(sendResult.message || "Invio non riuscito.");

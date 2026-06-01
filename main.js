@@ -5,6 +5,8 @@ const {
   startGoogleOAuthFlow,
   isGoogleAuthorized,
   logoutGoogle,
+  hasGoogleScope,
+  GMAIL_SEND_SCOPE,
 } = require("./src/main/auth");
 const { startScheduler, stopScheduler, shouldStartScheduler } = require("./src/main/scheduler");
 const { runSync, runSyncAll, setPostMarketingHook } = require("./src/main/syncRunner");
@@ -371,7 +373,10 @@ ipcMain.handle("connect-google", async () => {
 });
 
 ipcMain.handle("is-google-authorized", async () => {
-  return { authorized: isGoogleAuthorized() };
+  return {
+    authorized: isGoogleAuthorized(),
+    gmailSendAuthorized: hasGoogleScope(GMAIL_SEND_SCOPE),
+  };
 });
 
 ipcMain.handle("logout-google", async () => {

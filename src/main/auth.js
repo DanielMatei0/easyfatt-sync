@@ -14,7 +14,7 @@
  *     registrare manualmente ogni URI come per un Web Client.
  *   - Se si usa un OAuth Client di tipo "Web application", registrare i redirect:
  *     http://127.0.0.1:<porta>/callback e http://localhost:<porta>/callback
- *   - Scope richiesto: https://www.googleapis.com/auth/spreadsheets
+ *   - Scope richiesti: Google Sheets + Gmail send per invio marketing da Gmail.
  *
  * TOKEN:
  *   Salvato solo in locale (token.json in AppData per utente).
@@ -31,7 +31,9 @@ const { shell } = require("electron");
 
 const APP_ROOT = path.join(__dirname, "..", "..");
 const CREDENTIALS_PATH = path.join(APP_ROOT, "oauth_credentials.json");
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
+const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+const SCOPES = [GOOGLE_SHEETS_SCOPE, GMAIL_SEND_SCOPE];
 const OAUTH_TIMEOUT_MS = 2 * 60 * 1000;
 
 let activeOAuthServer = null;
@@ -299,6 +301,18 @@ function isGoogleAuthorized() {
   return fs.existsSync(tokenPath());
 }
 
+function getGoogleTokenScopes() {
+  const token = readGoogleToken();
+  return String(token?.scope || "")
+    .split(/\s+/)
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+}
+
+function hasGoogleScope(scope) {
+  return getGoogleTokenScopes().includes(scope);
+}
+
 function logoutGoogle() {
   stopOAuthServer();
   invalidateAuthCache();
@@ -331,4 +345,8 @@ module.exports = {
   tokenPath,
   readGoogleToken,
   writeGoogleToken,
+  getGoogleTokenScopes,
+  hasGoogleScope,
+  GOOGLE_SHEETS_SCOPE,
+  GMAIL_SEND_SCOPE,
 };
