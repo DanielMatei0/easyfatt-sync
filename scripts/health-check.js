@@ -144,6 +144,22 @@ function checkPackageJson(pkg) {
     pass("build.mac.artifactName stabile OK");
   }
 
+  const extra = build.extraResources;
+  const hasAssetsExtra =
+    Array.isArray(extra) &&
+    extra.some(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        item.from === "assets" &&
+        item.to === "assets",
+    );
+  if (!hasAssetsExtra) {
+    fail("build.extraResources deve copiare assets/ fuori da app.asar");
+  } else {
+    pass("build.extraResources assets OK");
+  }
+
   if (build.mac?.hardenedRuntime !== false) {
     warn("build.mac.hardenedRuntime non è false (ok solo dopo notarizzazione)");
   }

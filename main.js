@@ -87,6 +87,7 @@ function readLogoDataUrl(logoPath) {
   }
 }
 
+
 const AUTO_UPDATE_CHECK_DELAY_MS = 4000;
 
 const store = new Store();
