@@ -22,6 +22,12 @@ const {
 } = require("./src/main/syncState");
 const { LEGAL_VERSION } = require("./src/main/legalConstants");
 const { submitSupportRequest, getPlatformLabel } = require("./src/main/support");
+const {
+  initAvengest,
+  reportError: avengestReportError,
+  openTicket: avengestOpenTicket,
+  trackAnalytics: avengestTrackAnalytics,
+} = require("./src/main/avengest");
 const { applyOpenAtLoginSetting } = require("./src/main/loginSettings");
 const {
   buildSuggestedBackupFilename,
@@ -310,9 +316,35 @@ setPostMarketingHook(() => {
   sendMarketingUpdated();
 });
 
+/** Id installazione stabile (per external_ref dei ticket e context degli errori). Non è PII. */
+function getInstallId() {
+  let id = store.get("installId");
+  if (!id) {
+    id = require("crypto").randomUUID();
+    store.set("installId", id);
+  }
+  return id;
+}
+
 app.whenReady().then(() => {
   console.log("[Easyfatt Sync] Electron pronto.");
   applyDockIcon();
+
+  // Monitoraggio AvenGest: init prima della finestra così la cattura globale è attiva subito.
+  try {
+    initAvengest({
+      visitorId: getInstallId(),
+      logger: {
+        info: (m) => sendLog(String(m)),
+        warn: (m) => sendLog(String(m)),
+        error: (m) => sendLog(String(m)),
+      },
+    });
+    // Evento analytics di avvio app.
+    avengestTrackAnalytics({ type: "event", name: "app_open", path: "app" });
+  } catch (error) {
+    console.warn("[Easyfatt Sync] initAvengest fallito:", error?.message || error);
+  }
 
   createWindow();
   const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
@@ -335,6 +367,34 @@ app.on("window-all-closed", () => {
   }
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+// Crash del processo renderer / processi figli (GPU, utility) → errore su AvenGest.
+app.on("render-process-gone", (_event, _webContents, details) => {
+  try {
+    avengestReportError(new Error(`Renderer terminato: ${details?.reason || "sconosciuto"}`), {
+      fatal: true,
+      kind: "render-process-gone",
+      reason: details?.reason,
+      exitCode: details?.exitCode,
+    });
+  } catch {
+    /* mai bloccare */
+  }
+});
+
+app.on("child-process-gone", (_event, details) => {
+  if (details?.reason === "clean-exit") return;
+  try {
+    avengestReportError(new Error(`Processo figlio terminato: ${details?.type || "?"} (${details?.reason || "?"})`), {
+      kind: "child-process-gone",
+      type: details?.type,
+      reason: details?.reason,
+      exitCode: details?.exitCode,
+    });
+  } catch {
+    /* mai bloccare */
   }
 });
 
@@ -558,6 +618,55 @@ ipcMain.handle("submit-support-request", async (_, form) => {
     activeProfileId: active?.id || config.activeProfileId || null,
     activeProfileName: active?.name || null,
     diagnosticReport,
+  });
+});
+
+// Telemetria errori dal renderer (window.onerror / unhandledrejection) → AvenGest.
+ipcMain.handle("telemetry:error", (_event, payload = {}) => {
+  try {
+    const err = new Error(String(payload?.message || "Errore renderer"));
+    if (payload?.name) err.name = String(payload.name);
+    if (payload?.stack) err.stack = String(payload.stack);
+    avengestReportError(err, {
+      kind: payload?.kind || "renderer",
+      url: payload?.url,
+      screen: payload?.screen,
+      ...(payload?.context && typeof payload.context === "object" ? payload.context : {}),
+    });
+  } catch {
+    /* la telemetria non deve mai propagare errori al renderer */
+  }
+  return { ok: true };
+});
+
+// Analytics dal renderer (pageview per schermata + eventi chiave) → AvenGest.
+ipcMain.handle("analytics:track", (_event, ev = {}) => {
+  try {
+    avengestTrackAnalytics({
+      type: ev?.type,
+      name: ev?.name,
+      path: ev?.path,
+      durationMs: ev?.durationMs,
+    });
+  } catch {
+    /* le analitiche non devono mai propagare errori al renderer */
+  }
+  return { ok: true };
+});
+
+// Apertura ticket di supporto → AvenGest.
+ipcMain.handle("support:ticket", async (_event, input = {}) => {
+  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+  const active = getActiveProfile(config);
+  const techFooter = `\n\n---\nApp: ${app.getVersion()} · ${getPlatformLabel()} · profilo: ${
+    active?.name || "—"
+  } · id: ${getInstallId()}`;
+  return avengestOpenTicket({
+    subject: input?.subject,
+    description: `${String(input?.description || "")}${techFooter}`,
+    priority: input?.priority,
+    external_user: input?.external_user,
+    external_ref: input?.external_ref || getInstallId(),
   });
 });
 

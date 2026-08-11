@@ -364,7 +364,9 @@ function scheduleMarketingDailyJobs(store, log) {
                 appVersion: pkg.version || "",
               });
             } else {
-              await simulateAutomationRun(store, appConfig, automationId);
+              await simulateAutomationRun(store, appConfig, automationId, {
+                recordObservations: true,
+              });
             }
           } catch (error) {
             log(`[Marketing] Errore su «${automation.name || automationId}»: ${error.message}`);

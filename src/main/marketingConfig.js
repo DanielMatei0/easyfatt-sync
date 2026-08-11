@@ -30,6 +30,7 @@ function getDefaultMarketingConfig() {
     automations: [],
     templates: [],
     sendHistory: [],
+    pointsState: {},
     deletedAutomationNames: {},
     automationWizardDraft: null,
     businessProfile: getDefaultBusinessProfile(),
@@ -247,6 +248,52 @@ function normalizeMarketingProfile(profile, index = 0) {
   };
 }
 
+/** Cap di sicurezza sugli indirizzi tracciati per automazione (stato punti). */
+const MAX_POINTS_STATE_EMAILS = 20000;
+
+/**
+ * Normalizza la lista di soglie punti: numeri > 0, univoci, ordinati crescenti.
+ * Retro-compatibilità: se `raw` è assente usa la vecchia soglia singola.
+ */
+function normalizePointsThresholds(raw, legacySingle) {
+  let list = Array.isArray(raw) ? raw : [];
+  if (!list.length && legacySingle != null && Number(legacySingle) > 0) {
+    list = [legacySingle];
+  }
+  const cleaned = list
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return [...new Set(cleaned)].sort((a, b) => a - b);
+}
+
+/**
+ * Stato punti osservati per l'edge-trigger: { [automationId]: { [email]: { points, updatedAt } } }.
+ */
+function normalizePointsState(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const out = {};
+  Object.entries(raw).forEach(([autoId, emails]) => {
+    const id = String(autoId || "").trim();
+    if (!id || !emails || typeof emails !== "object") return;
+    const map = {};
+    let count = 0;
+    Object.entries(emails).forEach(([email, entry]) => {
+      if (count >= MAX_POINTS_STATE_EMAILS) return;
+      const key = String(email || "").trim().toLowerCase();
+      if (!key) return;
+      const points = Number(entry && typeof entry === "object" ? entry.points : entry);
+      if (!Number.isFinite(points)) return;
+      map[key] = {
+        points,
+        updatedAt: String((entry && entry.updatedAt) || "").trim(),
+      };
+      count += 1;
+    });
+    out[id] = map;
+  });
+  return out;
+}
+
 function normalizeAutomation(automation) {
   const a = automation && typeof automation === "object" ? automation : {};
   const conditions = a.conditions && typeof a.conditions === "object" ? a.conditions : {};
@@ -268,6 +315,11 @@ function normalizeAutomation(automation) {
     conditions: {
       pointsThreshold:
         conditions.pointsThreshold != null ? Number(conditions.pointsThreshold) || 0 : undefined,
+      pointsThresholds: normalizePointsThresholds(
+        conditions.pointsThresholds,
+        conditions.pointsThreshold
+      ),
+      multiCrossMode: conditions.multiCrossMode === "each" ? "each" : "highest",
       inactiveDays:
         conditions.inactiveDays != null ? Number(conditions.inactiveDays) || 0 : undefined,
       requireMarketingConsent:
@@ -376,6 +428,13 @@ function normalizeMarketingConfig(raw) {
     sendHistory = sendHistory.slice(0, MAX_SEND_HISTORY);
   }
 
+  // Stato punti (edge-trigger): tieni solo le automazioni ancora esistenti.
+  const automationIds = new Set(automations.map((a) => a.id));
+  const pointsState = {};
+  Object.entries(normalizePointsState(cfg.pointsState)).forEach(([autoId, map]) => {
+    if (automationIds.has(autoId)) pointsState[autoId] = map;
+  });
+
   const consentValues = Array.isArray(cfg.validConsentValues)
     ? cfg.validConsentValues.map((v) => String(v).trim().toLowerCase()).filter(Boolean)
     : [...DEFAULT_CONSENT_VALUES];
@@ -402,6 +461,7 @@ function normalizeMarketingConfig(raw) {
     automations,
     templates,
     sendHistory,
+    pointsState,
     deletedAutomationNames: normalizeDeletedAutomationNames(cfg.deletedAutomationNames),
     automationWizardDraft: normalizeAutomationWizardDraft(cfg.automationWizardDraft),
     realSendEnabled: cfg.realSendEnabled === false ? false : true,
@@ -433,6 +493,20 @@ function appendSendHistory(store, entries) {
 function clearSendHistory(store) {
   const cfg = getMarketingConfig(store);
   return setMarketingConfig(store, { ...cfg, sendHistory: [] });
+}
+
+/** Ritorna la mappa { [email]: { points, updatedAt } } osservata per un'automazione. */
+function getPointsObservations(store, automationId) {
+  const cfg = getMarketingConfig(store);
+  return (cfg.pointsState && cfg.pointsState[automationId]) || {};
+}
+
+/** Sostituisce lo stato punti osservato per un'automazione. */
+function setPointsObservations(store, automationId, map) {
+  if (!automationId) return getMarketingConfig(store);
+  const cfg = getMarketingConfig(store);
+  const nextState = { ...(cfg.pointsState || {}), [automationId]: map || {} };
+  return setMarketingConfig(store, { ...cfg, pointsState: nextState });
 }
 
 function seedDefaultTemplates(config) {
@@ -483,6 +557,9 @@ module.exports = {
   isAutomationRunnable,
   appendSendHistory,
   clearSendHistory,
+  getPointsObservations,
+  setPointsObservations,
+  normalizePointsThresholds,
   seedDefaultTemplates,
   normalizeAutomationWizardDraft,
   getDefaultBusinessProfile,

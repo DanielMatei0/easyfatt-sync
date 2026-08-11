@@ -4,6 +4,7 @@ node_modules/
 # Secrets / OAuth (never commit)
 oauth_credentials.json
 token.json
+avengest.config.json
 .env
 .env.local
 .env.production

@@ -85,8 +85,10 @@ function setPostMarketingHook(fn) {
 }
 
 async function runMarketingAfterSyncIfNeeded(store, profileId, log, trigger) {
-  const automaticTriggers = new Set(["watch", "schedule", "auto"]);
-  if (!automaticTriggers.has(trigger)) return null;
+  // Include "manual": quando la cliente sincronizza a mano (es. dopo aver creato
+  // una gift card), le automazioni collegate devono comunque partire.
+  const marketingTriggers = new Set(["watch", "schedule", "auto", "manual"]);
+  if (!marketingTriggers.has(trigger)) return null;
 
   try {
     const { processMarketingAfterSync } = require("./marketingEngine");

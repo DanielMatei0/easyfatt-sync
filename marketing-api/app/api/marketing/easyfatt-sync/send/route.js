@@ -4,7 +4,26 @@ const { renderMarketingEmail, getBusinessProfile } = require("../../../../../lib
 
 const MAX_RECIPIENTS = 50;
 
-function getFromAddress() {
+function cleanHeader(value) {
+  return String(value || "").replace(/[\r\n]+/g, " ").trim();
+}
+
+function formatAddress(email, name) {
+  const e = cleanHeader(email).toLowerCase();
+  if (!e) return "";
+  const n = cleanHeader(name);
+  return n ? `${n} <${e}>` : e;
+}
+
+// Mittente brandizzato sul cliente: usa SEMPRE il senderEmail configurato
+// dall'utente (dominio verificato via DNS su Resend). Il fallback Aven Labs
+// vale solo se il cliente non ha ancora impostato un mittente proprio.
+function getFromAddress(businessProfile) {
+  const own = formatAddress(
+    businessProfile?.senderEmail,
+    businessProfile?.senderName || businessProfile?.businessName
+  );
+  if (own) return own;
   return (
     process.env.MARKETING_FROM_EMAIL ||
     "Aven Labs Marketing <marketing@aven-labs.com>"
@@ -14,6 +33,7 @@ function getFromAddress() {
 function getReplyTo(businessProfile) {
   const reply =
     String(businessProfile?.replyToEmail || "").trim() ||
+    String(businessProfile?.senderEmail || "").trim() ||
     process.env.MARKETING_REPLY_FALLBACK ||
     "support@aven-labs.com";
   return reply;
@@ -36,6 +56,7 @@ function buildMarketingConfig(businessProfile) {
   return {
     businessName: businessProfile.businessName || "",
     senderName: businessProfile.senderName || "",
+    senderEmail: businessProfile.senderEmail || "",
     replyToEmail: businessProfile.replyToEmail || "",
     businessProfile,
   };
@@ -80,7 +101,7 @@ export async function POST(request) {
       bp.logoDataUrl = businessProfile.logoUrl;
     }
 
-    const from = getFromAddress();
+    const from = getFromAddress(businessProfile);
     const replyTo = getReplyTo(businessProfile);
     const results = [];
 

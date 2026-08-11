@@ -42,6 +42,17 @@ jobs:
           fi
           printf '%s' "$OAUTH_CREDENTIALS_JSON" > oauth_credentials.json
 
+      - name: Create AvenGest config file (monitoring/analytics keys)
+        shell: bash
+        env:
+          AVENGEST_CONFIG_JSON: ${{ secrets.AVENGEST_CONFIG_JSON }}
+        run: |
+          if [ -z "$AVENGEST_CONFIG_JSON" ]; then
+            echo "::warning::AVENGEST_CONFIG_JSON secret vuoto — la build non avrà le chiavi AvenGest (telemetria/analytics disattivate)."
+          else
+            printf '%s' "$AVENGEST_CONFIG_JSON" > avengest.config.json
+          fi
+
       - name: Build Windows installer
         if: matrix.os == 'windows-latest'
         run: npm run dist:win
@@ -62,7 +73,7 @@ jobs:
       - name: Cleanup OAuth credentials
         if: always()
         shell: bash
-        run: rm -f oauth_credentials.json
+        run: rm -f oauth_credentials.json avengest.config.json
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2

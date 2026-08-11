@@ -85,6 +85,8 @@
         birthdayOncePerYear: true,
         pointsTriggerEnabled: true,
         pointsThreshold: 100,
+        pointsThresholds: [100],
+        multiCrossMode: "highest",
         firstThresholdOnly: true,
         inactiveDays: 90,
         fidelityMode: "new_fidelity",
@@ -506,26 +508,38 @@
           <span class="mkt-toggle-card-body"><strong>Trigger punti attivo</strong><span>Notifica al raggiungimento soglia.</span></span>
         </label>`;
       colCombo("points", "Colonna punti", "Valori numerici fidelity.");
+      const thresholdsValue = (
+        Array.isArray(state.conditions.pointsThresholds) && state.conditions.pointsThresholds.length
+          ? state.conditions.pointsThresholds
+          : Number(state.conditions.pointsThreshold) > 0
+            ? [Number(state.conditions.pointsThreshold)]
+            : []
+      ).join(", ");
       fields.insertAdjacentHTML(
         "beforeend",
-        `<label class="mkt-field"><span class="field-label">Soglia punti</span><input type="number" id="mAutoWizPointsThreshold" class="mkt-input" min="1" value="${Number(state.conditions.pointsThreshold) || 100}" /></label>
-        <label class="mkt-field"><span class="field-label">Cooldown (giorni)</span><input type="number" id="mAutoWizCooldown" class="mkt-input" min="0" value="${Number(state.conditions.cooldownDays) || 30}" /><p class="field-hint">Evita messaggi ripetuti allo stesso cliente.</p></label>
-        <label class="mkt-toggle-card">
-          <input type="checkbox" id="mAutoWizFirstOnly" ${state.conditions.firstThresholdOnly !== false ? "checked" : ""} />
-          <span class="mkt-toggle-card-body"><strong>Solo al primo raggiungimento</strong><span>Un invio per soglia, poi non ripete.</span></span>
+        `<label class="mkt-field"><span class="field-label">Soglie punti</span><input type="text" id="mAutoWizPointsThresholds" class="mkt-input" value="${escapeHtml(thresholdsValue)}" placeholder="Es. 30, 60, 100" inputmode="numeric" /><p class="field-hint">Una o più soglie separate da virgola. La mail parte quando il cliente supera una soglia; non si ripete finché non riscende sotto e la risupera.</p></label>
+        <label class="mkt-field"><span class="field-label">Se supera più soglie insieme</span>
+          <select id="mAutoWizMultiCross" class="mkt-select">
+            <option value="highest" ${state.conditions.multiCrossMode !== "each" ? "selected" : ""}>Una email (soglia più alta)</option>
+            <option value="each" ${state.conditions.multiCrossMode === "each" ? "selected" : ""}>Una email per ogni soglia</option>
+          </select>
+          <p class="field-hint">Es. da 20 a 100 con soglie 30/60/100: "una email" invia solo la 100, "una per soglia" ne invia 3.</p>
         </label>`
       );
       $("mAutoWizPointsEnabled")?.addEventListener("change", (e) => {
         state.conditions.pointsTriggerEnabled = e.target.checked;
       });
-      $("mAutoWizPointsThreshold")?.addEventListener("input", (e) => {
-        state.conditions.pointsThreshold = Number(e.target.value) || 100;
+      $("mAutoWizPointsThresholds")?.addEventListener("input", (e) => {
+        const list = String(e.target.value || "")
+          .split(/[,;\s]+/)
+          .map((v) => Number(v))
+          .filter((n) => Number.isFinite(n) && n > 0);
+        const unique = [...new Set(list)].sort((a, b) => a - b);
+        state.conditions.pointsThresholds = unique;
+        state.conditions.pointsThreshold = unique[0] || 0;
       });
-      $("mAutoWizCooldown")?.addEventListener("input", (e) => {
-        state.conditions.cooldownDays = Number(e.target.value) || 0;
-      });
-      $("mAutoWizFirstOnly")?.addEventListener("change", (e) => {
-        state.conditions.firstThresholdOnly = e.target.checked;
+      $("mAutoWizMultiCross")?.addEventListener("change", (e) => {
+        state.conditions.multiCrossMode = e.target.value === "each" ? "each" : "highest";
       });
       return;
     }
@@ -792,6 +806,13 @@
       }
       if (state.type === "points_threshold" && !map.points && !state.columnMapping.points) {
         deps.showToast?.("Seleziona la colonna punti.", { error: true });
+        return false;
+      }
+      if (
+        state.type === "points_threshold" &&
+        !(Array.isArray(state.conditions.pointsThresholds) && state.conditions.pointsThresholds.length)
+      ) {
+        deps.showToast?.("Imposta almeno una soglia punti (es. 30, 60, 100).", { error: true });
         return false;
       }
       if (state.type === "inactive_customer" && !map.lastPurchaseDate && !state.columnMapping.lastPurchaseDate) {

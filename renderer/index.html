@@ -1104,7 +1104,40 @@
                 <p>Un file con stato app e cronologia: utile da allegare al supporto.</p>
                 <button type="button" id="supportViewDiagBtn" class="btn btn-secondary">Salva report</button>
               </article>
+              <article class="support-view-block">
+                <div class="support-view-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8L12 2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Segnala un problema</h3>
+                <p>Apri un ticket tracciato: lo staff lo riceve e ti ricontatta.</p>
+                <button type="button" id="ticketOpenFormBtn" class="btn btn-primary">Apri un ticket</button>
+              </article>
             </div>
+
+            <form id="ticketForm" class="support-ticket-form" hidden>
+              <h3 class="support-ticket-title">Nuovo ticket di supporto</h3>
+              <div class="mkt-form-grid mkt-form-grid-2">
+                <label class="mkt-field"><span class="field-label">Il tuo nome</span><input type="text" id="ticketName" class="mkt-input" placeholder="Nome e cognome" /></label>
+                <label class="mkt-field"><span class="field-label">Email</span><input type="email" id="ticketEmail" class="mkt-input" placeholder="tua@email.it" /></label>
+              </div>
+              <div class="mkt-form-grid mkt-form-grid-2">
+                <label class="mkt-field"><span class="field-label">Oggetto</span><input type="text" id="ticketSubject" class="mkt-input" placeholder="Es. Errore durante la sincronizzazione" /></label>
+                <label class="mkt-field"><span class="field-label">Priorità</span>
+                  <select id="ticketPriority" class="mkt-select">
+                    <option value="LOW">Bassa</option>
+                    <option value="NORMAL" selected>Normale</option>
+                    <option value="HIGH">Alta</option>
+                    <option value="URGENT">Urgente</option>
+                  </select>
+                </label>
+              </div>
+              <label class="mkt-field"><span class="field-label">Descrizione</span><textarea id="ticketDescription" class="mkt-input" rows="5" placeholder="Descrivi il problema: cosa stavi facendo, cosa è successo, eventuali messaggi di errore."></textarea></label>
+              <p id="ticketFeedback" class="mkt-form-feedback" hidden role="status"></p>
+              <div class="mkt-secondary-actions">
+                <button type="submit" id="ticketSubmitBtn" class="btn btn-primary">Invia ticket</button>
+                <button type="button" id="ticketCancelBtn" class="btn btn-ghost btn-sm">Annulla</button>
+              </div>
+            </form>
           </div>
         </section>
         <!-- /VIEW SUPPORTO -->
@@ -1631,8 +1664,8 @@
         <div class="mkt-form-grid mkt-form-grid-2">
           <label class="mkt-field"><span class="field-label">Modalità esecuzione</span>
             <select id="mAutoScheduleMode" class="mkt-select">
-              <option value="manual">Manuale (simula su richiesta)</option>
-              <option value="daily">Giornaliera (futuro)</option>
+              <option value="daily">Giornaliera (automatica)</option>
+              <option value="manual">Manuale (nessun invio automatico)</option>
             </select>
           </label>
           <label class="mkt-field m-auto-schedule-time" id="mAutoScheduleTimeWrap"><span class="field-label">Orario</span><input type="text" id="mAutoScheduleTime" class="mkt-input" value="09:00" placeholder="09:00" /><p class="field-hint">Formato HH:MM — attivo con esecuzione giornaliera.</p></label>
@@ -1860,6 +1893,7 @@
 
   <div id="marketingToastHost" class="mkt-toast-host" aria-live="polite" aria-atomic="true"></div>
 
+  <script src="./telemetry.js"></script>
   <script src="./dashboard-ui.js"></script>
   <script src="./history-ui.js"></script>
   <script src="./onboarding-ui.js"></script>

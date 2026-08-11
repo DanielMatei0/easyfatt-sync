@@ -4,6 +4,8 @@ const {
   getMarketingConfig,
   setMarketingConfig,
   appendSendHistory,
+  getPointsObservations,
+  setPointsObservations,
   createId,
   isAutomationRunnable,
   normalizeAutomation,
@@ -173,7 +175,7 @@ function wasEverContactedForAutomation(history, automationId, email) {
   );
 }
 
-function evaluateCustomerForAutomation(customer, automation, config, history) {
+function evaluateCustomerForAutomation(customer, automation, config, history, prevPoints) {
   const today = new Date();
   const email = customer.email;
 
@@ -211,21 +213,49 @@ function evaluateCustomerForAutomation(customer, automation, config, history) {
       if (automation.conditions?.pointsTriggerEnabled === false) {
         return { match: false, reason: "Trigger punti disattivato" };
       }
-      const threshold = Number(automation.conditions?.pointsThreshold) || 100;
-      if (customer.points == null) {
+      const thresholds =
+        Array.isArray(automation.conditions?.pointsThresholds) &&
+        automation.conditions.pointsThresholds.length
+          ? automation.conditions.pointsThresholds
+          : Number(automation.conditions?.pointsThreshold) > 0
+            ? [Number(automation.conditions.pointsThreshold)]
+            : [];
+      if (!thresholds.length) {
+        return { match: false, reason: "Nessuna soglia punti impostata" };
+      }
+      if (customer.points == null || !Number.isFinite(Number(customer.points))) {
         return { match: false, reason: "Punti non disponibili" };
       }
-      if (customer.points < threshold) {
-        return { match: false, reason: `Punti sotto soglia (${threshold})` };
+      const curr = Number(customer.points);
+      // Edge-trigger con isteresi: serve il valore osservato in precedenza.
+      if (prevPoints == null || !Number.isFinite(Number(prevPoints))) {
+        return {
+          match: false,
+          reason: "Prima osservazione: invio al prossimo superamento soglia",
+        };
       }
-      const firstOnly = automation.conditions?.firstThresholdOnly !== false;
-      if (firstOnly && wasSentForThreshold(history, automation.id, email, threshold)) {
-        return { match: false, reason: `Già notificato per soglia ${threshold}` };
+      const prev = Number(prevPoints);
+      // Soglia "attraversata verso l'alto": prima sotto, ora pari/oltre.
+      const crossed = thresholds.filter((t) => prev < t && curr >= t);
+      if (!crossed.length) {
+        return { match: false, reason: `Nessuna soglia attraversata (${prev} → ${curr})` };
       }
-      if (wasContactedWithinCooldown(history, automation.id, email, cooldown)) {
-        return { match: false, reason: `In cooldown (${cooldown} giorni)` };
+      const mode = automation.conditions?.multiCrossMode === "each" ? "each" : "highest";
+      if (mode === "each") {
+        return {
+          match: true,
+          metas: crossed.map((t) => ({
+            thresholdKey: `threshold:${t}`,
+            threshold: t,
+            points: curr,
+          })),
+        };
       }
-      return { match: true, meta: { thresholdKey: `threshold:${threshold}`, threshold } };
+      const top = Math.max(...crossed);
+      return {
+        match: true,
+        meta: { thresholdKey: `threshold:${top}`, threshold: top, points: curr },
+      };
     }
 
     case "new_fidelity": {
@@ -335,14 +365,25 @@ function buildEventKey(automation, email, meta = {}) {
   return `${aId}:${e}`;
 }
 
-function evaluateAutomation(automation, customers, history, config) {
+function evaluateAutomation(automation, customers, history, config, pointsObs = {}) {
   const recipients = [];
   const skipped = [];
 
   customers.forEach((customer) => {
-    const result = evaluateCustomerForAutomation(customer, automation, config, history);
+    const emailKey = String(customer.email || "").trim().toLowerCase();
+    const prevPoints =
+      emailKey && pointsObs[emailKey] ? pointsObs[emailKey].points : undefined;
+    const result = evaluateCustomerForAutomation(
+      customer,
+      automation,
+      config,
+      history,
+      prevPoints
+    );
     if (result.match) {
-      recipients.push({ customer, meta: result.meta || {} });
+      // Modalità "each": un destinatario per ogni soglia attraversata.
+      const metas = Array.isArray(result.metas) ? result.metas : [result.meta || {}];
+      metas.forEach((meta) => recipients.push({ customer, meta }));
     } else {
       skipped.push({
         customer,
@@ -436,6 +477,38 @@ async function loadCustomersForMarketingProfile(
   };
 }
 
+/**
+ * Salva i punti correnti di TUTTI i clienti come stato osservato per l'automazione
+ * punti. È la base dell'edge-trigger: al run successivo si confronta prev→curr per
+ * capire se una soglia è stata attraversata. Va chiamata dopo ogni run di produzione
+ * (post-sync, cron, invio reale), anche quando non ci sono destinatari, così il
+ * baseline si stabilisce ed evita invii di massa ai clienti già sopra soglia.
+ */
+async function recordPointsObservations(store, appConfig, automation) {
+  if (!automation || automation.type !== "points_threshold") return;
+  let customers;
+  try {
+    ({ customers } = await loadCustomersForMarketingProfile(
+      store,
+      appConfig,
+      automation.marketingProfileId
+    ));
+  } catch {
+    // Se non riusciamo a leggere i clienti non tocchiamo lo stato salvato.
+    return;
+  }
+  const next = { ...getPointsObservations(store, automation.id) };
+  const now = new Date().toISOString();
+  customers.forEach((c) => {
+    const email = String(c.email || "").trim().toLowerCase();
+    if (!email) return;
+    const pts = Number(c.points);
+    if (!Number.isFinite(pts)) return;
+    next[email] = { points: pts, updatedAt: now };
+  });
+  setPointsObservations(store, automation.id, next);
+}
+
 function countDuplicateEmails(customers) {
   const seen = new Set();
   let duplicates = 0;
@@ -451,11 +524,13 @@ function countDuplicateEmails(customers) {
 }
 
 function buildRecipientsPayload(automation, customers, marketing, marketingProfile, syncProfile) {
+  const pointsObs = (marketing.pointsState && marketing.pointsState[automation.id]) || {};
   const { recipients, skipped } = evaluateAutomation(
     automation,
     customers,
     marketing.sendHistory,
-    marketing
+    marketing,
+    pointsObs
   );
 
   const withoutEmail = customers.filter((c) => !c.email).length;
@@ -659,6 +734,13 @@ async function executeAutomationSend(store, appConfig, automationId, options = {
   }
 
   const preview = await getAutomationRecipients(store, appConfig, automationId);
+
+  // Su ogni invio reale aggiorna il baseline punti (anche se 0 destinatari):
+  // il preview qui sopra ha già usato lo stato precedente per rilevare i superamenti.
+  if (!dryRun) {
+    await recordPointsObservations(store, appConfig, automation);
+  }
+
   let recipientRows = preview.recipients
     .filter((r) => r.email || r.customer?.email)
     .map((r) => {
@@ -865,7 +947,8 @@ async function simulateAutomationDraft(store, appConfig, automation, columnMappi
   };
 }
 
-async function simulateAutomationRun(store, appConfig, automationId) {
+async function simulateAutomationRun(store, appConfig, automationId, options = {}) {
+  const { recordObservations = false } = options;
   const marketing = getMarketingConfig(store);
   const automation = marketing.automations.find((a) => a.id === automationId);
   if (!automation) {
@@ -884,6 +967,13 @@ async function simulateAutomationRun(store, appConfig, automationId) {
   }
 
   const preview = await getAutomationRecipients(store, appConfig, automationId);
+
+  // Solo quando la simulazione è una run di produzione (post-sync/cron senza invio
+  // reale) aggiorniamo il baseline punti; la simulazione manuale non tocca lo stato.
+  if (recordObservations) {
+    await recordPointsObservations(store, appConfig, automation);
+  }
+
   const historyEntries = [];
   const rendered = [];
 
@@ -1097,7 +1187,9 @@ async function processMarketingAfterSync(store, appConfig, syncProfileId, log = 
         });
         log(`[Marketing] «${automation.name}»: ${result.message || "invio completato"}`);
       } else {
-        result = await simulateAutomationRun(store, appConfig, automation.id);
+        result = await simulateAutomationRun(store, appConfig, automation.id, {
+          recordObservations: true,
+        });
         log(`[Marketing] «${automation.name}»: ${result.message || "simulazione completata"}`);
       }
 
@@ -1178,6 +1270,7 @@ module.exports = {
   simulateAutomationDraft,
   simulateAutomationRun,
   processMarketingAfterSync,
+  recordPointsObservations,
   getMarketingStats,
   simulateTestEmail,
   isValidEmail,

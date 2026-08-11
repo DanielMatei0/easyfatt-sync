@@ -1,6 +1,6 @@
 {
   "name": "easyfatt-sync-app",
-  "version": "26.1.2",
+  "version": "26.2.0",
   "description": "Easyfatt Sync — Aven Labs (Excel → Google Sheets)",
   "main": "main.js",
   "scripts": {
@@ -59,6 +59,7 @@
     "nsis": {
       "oneClick": true,
       "perMachine": false,
+      "guid": "8ee64b4e-815e-5977-b168-95e43ad97db9",
       "allowElevation": true,
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,

@@ -1,0 +1,7 @@
+{
+  "_comment": "Copia in avengest.config.json (NON committato) e inserisci le chiavi AvenGest del progetto. Vengono lette SOLO nel processo main. In alternativa usa le env AVENGEST_API_KEY / AVENGEST_ANALYTICS_KEY.",
+  "_apiKey": "Chiave errori/ticket/sicurezza (formato avn_...): AvenGest → progetto → Ticket → Gestione chiavi API",
+  "apiKey": "avn_xxxxxxxxxxxxxxxxxxxxxxxx",
+  "_analyticsKey": "Chiave analytics (formato avnp_...): AvenGest → progetto → Analitiche → genera/copia chiave",
+  "analyticsKey": "avnp_xxxxxxxxxxxxxxxxxxxxxxxx"
+}
