@@ -86,6 +86,7 @@
         pointsTriggerEnabled: true,
         pointsThreshold: 100,
         pointsThresholds: [100],
+        pointsThresholdRewards: {},
         multiCrossMode: "highest",
         firstThresholdOnly: true,
         inactiveDays: 90,
@@ -524,8 +525,33 @@
             <option value="each" ${state.conditions.multiCrossMode === "each" ? "selected" : ""}>Una email per ogni soglia</option>
           </select>
           <p class="field-hint">Es. da 20 a 100 con soglie 30/60/100: "una email" invia solo la 100, "una per soglia" ne invia 3.</p>
-        </label>`
+        </label>
+        <div class="mkt-field">
+          <span class="field-label">Premio per soglia</span>
+          <div id="mAutoWizRewards"></div>
+          <p class="field-hint">Testo del premio per ogni soglia. Nel template usa <code>{{soglia}}</code> e <code>{{premio}}</code>: si adattano alla soglia superata.</p>
+        </div>`
       );
+
+      const renderRewardFields = () => {
+        const wrap = $("mAutoWizRewards");
+        if (!wrap) return;
+        const list = Array.isArray(state.conditions.pointsThresholds)
+          ? state.conditions.pointsThresholds
+          : [];
+        const rewards = state.conditions.pointsThresholdRewards || {};
+        if (!list.length) {
+          wrap.innerHTML = `<p class="field-hint">Inserisci prima una o più soglie qui sopra.</p>`;
+          return;
+        }
+        wrap.innerHTML = list
+          .map(
+            (t) =>
+              `<div class="mkt-reward-row"><span class="mkt-reward-threshold">${escapeHtml(String(t))} punti</span><input type="text" class="mkt-input" data-reward-threshold="${escapeHtml(String(t))}" value="${escapeHtml(String(rewards[String(t)] || ""))}" placeholder="Es. Sconto 10%" /></div>`
+          )
+          .join("");
+      };
+
       $("mAutoWizPointsEnabled")?.addEventListener("change", (e) => {
         state.conditions.pointsTriggerEnabled = e.target.checked;
       });
@@ -537,10 +563,29 @@
         const unique = [...new Set(list)].sort((a, b) => a - b);
         state.conditions.pointsThresholds = unique;
         state.conditions.pointsThreshold = unique[0] || 0;
+        // Pota i premi delle soglie non più presenti.
+        const rewards = state.conditions.pointsThresholdRewards || {};
+        const keep = {};
+        unique.forEach((t) => {
+          if (rewards[String(t)]) keep[String(t)] = rewards[String(t)];
+        });
+        state.conditions.pointsThresholdRewards = keep;
+        renderRewardFields();
       });
       $("mAutoWizMultiCross")?.addEventListener("change", (e) => {
         state.conditions.multiCrossMode = e.target.value === "each" ? "each" : "highest";
       });
+      // Delegation: aggiorna il premio della soglia mentre si scrive.
+      $("mAutoWizRewards")?.addEventListener("input", (e) => {
+        const input = e.target.closest("[data-reward-threshold]");
+        if (!input) return;
+        const t = input.getAttribute("data-reward-threshold");
+        if (!state.conditions.pointsThresholdRewards) state.conditions.pointsThresholdRewards = {};
+        const text = String(input.value || "").trim();
+        if (text) state.conditions.pointsThresholdRewards[t] = text;
+        else delete state.conditions.pointsThresholdRewards[t];
+      });
+      renderRewardFields();
       return;
     }
 

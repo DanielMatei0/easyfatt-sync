@@ -240,6 +240,11 @@ function evaluateCustomerForAutomation(customer, automation, config, history, pr
       if (!crossed.length) {
         return { match: false, reason: `Nessuna soglia attraversata (${prev} → ${curr})` };
       }
+      const rewardsMap = automation.conditions?.pointsThresholdRewards || {};
+      const rewardFor = (t) => {
+        const r = String(rewardsMap[String(t)] || "").trim();
+        return r || undefined;
+      };
       const mode = automation.conditions?.multiCrossMode === "each" ? "each" : "highest";
       if (mode === "each") {
         return {
@@ -248,13 +253,14 @@ function evaluateCustomerForAutomation(customer, automation, config, history, pr
             thresholdKey: `threshold:${t}`,
             threshold: t,
             points: curr,
+            reward: rewardFor(t),
           })),
         };
       }
       const top = Math.max(...crossed);
       return {
         match: true,
-        meta: { thresholdKey: `threshold:${top}`, threshold: top, points: curr },
+        meta: { thresholdKey: `threshold:${top}`, threshold: top, points: curr, reward: rewardFor(top) },
       };
     }
 
@@ -523,7 +529,7 @@ function countDuplicateEmails(customers) {
   return duplicates;
 }
 
-function buildRecipientsPayload(automation, customers, marketing, marketingProfile, syncProfile) {
+function buildRecipientsPayload(automation, customers, marketing, marketingProfile, syncProfile, headers = []) {
   const pointsObs = (marketing.pointsState && marketing.pointsState[automation.id]) || {};
   const { recipients, skipped } = evaluateAutomation(
     automation,
@@ -544,6 +550,8 @@ function buildRecipientsPayload(automation, customers, marketing, marketingProfi
     automation,
     marketingProfile,
     syncProfile,
+    // Intestazioni Excel (ordine colonne) per mostrare tutti i campi nell'anteprima.
+    headers: Array.isArray(headers) ? headers : [],
     summary: {
       total: customers.length,
       valid: recipients.length,
@@ -564,11 +572,13 @@ function buildRecipientsPayload(automation, customers, marketing, marketingProfi
           fidelityCardNumber: r.customer.fidelityCardNumber,
           meta: r.meta,
           customer: r.customer,
+          row: r.customer._row || {},
         })),
         skipped: skipped.map((s) => ({
           email: s.customer.email || "—",
           name: s.customer.fullName || s.customer.firstName || "—",
           reason: s.reason,
+          row: s.customer?._row || {},
         })),
   };
 }
@@ -587,8 +597,8 @@ function getAutomationRecipientsFromAutomation(
     appConfig,
     normalized.marketingProfileId,
     columnMappingOverride
-  ).then(({ customers, marketingProfile, syncProfile }) =>
-    buildRecipientsPayload(normalized, customers, marketing, marketingProfile, syncProfile)
+  ).then(({ customers, marketingProfile, syncProfile, headers }) =>
+    buildRecipientsPayload(normalized, customers, marketing, marketingProfile, syncProfile, headers)
   );
 }
 
@@ -628,6 +638,7 @@ function buildRecipientVariables(customer, marketing, meta = {}) {
   const bp = getBusinessProfile(marketing);
   return buildVariableMap(customer, bp, {
     reward: meta.reward || "un omaggio speciale",
+    threshold: meta.threshold,
     businessName: bp.businessName,
   });
 }
@@ -670,7 +681,7 @@ function buildMarketingSendPayload(
   };
 }
 
-function mapBackendResultsToHistory(automation, recipientRows, backendResults, { dryRun }) {
+function mapBackendResultsToHistory(automation, recipientRows, backendResults, { dryRun, batchId }) {
   const resultByEmail = new Map();
   (backendResults || []).forEach((r) => {
     resultByEmail.set(String(r.email || "").toLowerCase(), r);
@@ -698,6 +709,7 @@ function mapBackendResultsToHistory(automation, recipientRows, backendResults, {
 
     entries.push({
       id: createId("send"),
+      batchId: batchId || "",
       automationId: automation.id,
       recipientEmail: email,
       recipientName: r.customer.fullName || r.customer.firstName,
@@ -705,7 +717,15 @@ function mapBackendResultsToHistory(automation, recipientRows, backendResults, {
       status,
       reason,
       eventKey,
-      meta: { ...r.meta, eventKey, dryRun: !!dryRun },
+      // Info-cliente sintetiche per la lista destinatari dell'invio (no dati sensibili).
+      meta: {
+        ...r.meta,
+        eventKey,
+        batchId: batchId || "",
+        dryRun: !!dryRun,
+        points: r.customer.points != null ? r.customer.points : undefined,
+        fidelityCardNumber: r.customer.fidelityCardNumber || undefined,
+      },
     });
   });
 
@@ -795,17 +815,19 @@ async function executeAutomationSend(store, appConfig, automationId, options = {
     throw new Error(sendResult.message || "Invio non riuscito.");
   }
 
+  const batchId = createId("batch");
   const historyEntries = mapBackendResultsToHistory(
     automation,
     recipientRows,
     sendResult.results,
-    { dryRun }
+    { dryRun, batchId }
   );
 
   preview.skipped.forEach((s) => {
     if (!s.email || s.email === "—") return;
     historyEntries.push({
       id: createId("send"),
+      batchId,
       automationId: automation.id,
       recipientEmail: s.email,
       recipientName: s.name,
@@ -813,7 +835,7 @@ async function executeAutomationSend(store, appConfig, automationId, options = {
       status: "skipped",
       reason: s.reason,
       eventKey: buildEventKey(automation, s.email, {}),
-      meta: {},
+      meta: { batchId },
     });
   });
 
@@ -848,6 +870,7 @@ async function executeAutomationSend(store, appConfig, automationId, options = {
     summary: preview.summary,
     results: sendResult.results,
     recipientsCount: recipientRows.length,
+    batchId,
   };
 }
 
@@ -883,6 +906,7 @@ async function simulateAutomationDraft(store, appConfig, automation, columnMappi
 
   const historyEntries = [];
   const rendered = [];
+  const batchId = createId("batch");
 
   preview.recipients.forEach((r) => {
     const customer = {
@@ -906,6 +930,7 @@ async function simulateAutomationDraft(store, appConfig, automation, columnMappi
 
     historyEntries.push({
       id: createId("send"),
+      batchId,
       automationId: normalized.id,
       recipientEmail: r.email,
       recipientName: r.name,
@@ -913,7 +938,12 @@ async function simulateAutomationDraft(store, appConfig, automation, columnMappi
       status: "simulated",
       reason: marketing.realSendEnabled ? "" : "Simulazione locale (wizard)",
       eventKey: buildEventKey(normalized, r.email, r.meta),
-      meta: { ...(r.meta || {}), eventKey: buildEventKey(normalized, r.email, r.meta) },
+      meta: {
+        ...(r.meta || {}),
+        eventKey: buildEventKey(normalized, r.email, r.meta),
+        batchId,
+        points: r.points != null ? r.points : undefined,
+      },
     });
   });
 
@@ -921,6 +951,7 @@ async function simulateAutomationDraft(store, appConfig, automation, columnMappi
     if (!s.email || s.email === "—") return;
     historyEntries.push({
       id: createId("send"),
+      batchId,
       automationId: normalized.id,
       recipientEmail: s.email,
       recipientName: s.name,
@@ -928,7 +959,7 @@ async function simulateAutomationDraft(store, appConfig, automation, columnMappi
       status: "skipped",
       reason: s.reason,
       eventKey: buildEventKey(normalized, s.email, {}),
-      meta: {},
+      meta: { batchId },
     });
   });
 
@@ -976,6 +1007,7 @@ async function simulateAutomationRun(store, appConfig, automationId, options = {
 
   const historyEntries = [];
   const rendered = [];
+  const batchId = createId("batch");
 
   preview.recipients.forEach((r) => {
     const customer = {
@@ -999,6 +1031,7 @@ async function simulateAutomationRun(store, appConfig, automationId, options = {
 
     historyEntries.push({
       id: createId("send"),
+      batchId,
       automationId: automation.id,
       recipientEmail: r.email,
       recipientName: r.name,
@@ -1006,7 +1039,12 @@ async function simulateAutomationRun(store, appConfig, automationId, options = {
       status: "simulated",
       reason: marketing.realSendEnabled ? "" : "Simulazione locale",
       eventKey: buildEventKey(automation, r.email, r.meta),
-      meta: { ...(r.meta || {}), eventKey: buildEventKey(automation, r.email, r.meta) },
+      meta: {
+        ...(r.meta || {}),
+        eventKey: buildEventKey(automation, r.email, r.meta),
+        batchId,
+        points: r.points != null ? r.points : undefined,
+      },
     });
   });
 
@@ -1014,6 +1052,7 @@ async function simulateAutomationRun(store, appConfig, automationId, options = {
     if (!s.email || s.email === "—") return;
     historyEntries.push({
       id: createId("send"),
+      batchId,
       automationId: automation.id,
       recipientEmail: s.email,
       recipientName: s.name,
@@ -1021,7 +1060,7 @@ async function simulateAutomationRun(store, appConfig, automationId, options = {
       status: "skipped",
       reason: s.reason,
       eventKey: buildEventKey(automation, s.email, {}),
-      meta: {},
+      meta: { batchId },
     });
   });
 

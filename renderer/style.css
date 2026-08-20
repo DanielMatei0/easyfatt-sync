@@ -5732,6 +5732,39 @@ body.mkt-modal-open {
   border: none;
   border-radius: 0;
   max-height: 340px;
+  overflow: auto;
+}
+
+.mkt-reward-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.mkt-reward-threshold {
+  flex: 0 0 88px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted, #6b7280);
+}
+.mkt-reward-row .mkt-input {
+  flex: 1;
+}
+
+.mkt-link-count {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--accent, #ff7a00);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.mkt-link-count:hover {
+  opacity: 0.85;
 }
 
 /* Responsive */

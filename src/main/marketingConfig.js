@@ -267,6 +267,23 @@ function normalizePointsThresholds(raw, legacySingle) {
 }
 
 /**
+ * Mappa soglia→testo premio: { "30": "Sconto 10%", "60": "Buono 5€" }.
+ * Chiavi numeriche > 0, valori testo non vuoti (max 300).
+ */
+function normalizePointsThresholdRewards(raw) {
+  const out = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    Object.entries(raw).forEach(([key, value]) => {
+      const t = Number(key);
+      if (!Number.isFinite(t) || t <= 0) return;
+      const text = String(value ?? "").trim();
+      if (text) out[String(t)] = text.slice(0, 300);
+    });
+  }
+  return out;
+}
+
+/**
  * Stato punti osservati per l'edge-trigger: { [automationId]: { [email]: { points, updatedAt } } }.
  */
 function normalizePointsState(raw) {
@@ -319,6 +336,7 @@ function normalizeAutomation(automation) {
         conditions.pointsThresholds,
         conditions.pointsThreshold
       ),
+      pointsThresholdRewards: normalizePointsThresholdRewards(conditions.pointsThresholdRewards),
       multiCrossMode: conditions.multiCrossMode === "each" ? "each" : "highest",
       inactiveDays:
         conditions.inactiveDays != null ? Number(conditions.inactiveDays) || 0 : undefined,
@@ -393,6 +411,7 @@ function normalizeSendHistoryEntry(entry) {
   const e = entry && typeof entry === "object" ? entry : {};
   return {
     id: String(e.id || "").trim() || createId("send"),
+    batchId: String(e.batchId || e.meta?.batchId || "").trim(),
     automationId: String(e.automationId || "").trim(),
     recipientEmail: String(e.recipientEmail || "").trim().toLowerCase(),
     recipientName: String(e.recipientName || "").trim(),

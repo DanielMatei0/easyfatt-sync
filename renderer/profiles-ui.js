@@ -109,8 +109,7 @@
   function setProfileModalVisible(visible) {
     if (!profileModal) return;
     profileModal.hidden = !visible;
-    const appShell = document.getElementById("appShell");
-    appShell?.classList.toggle("is-blocked", visible);
+    window.shellBlock?.set("profile", visible);
     document.body.classList.toggle("profile-modal-open", visible);
     if (visible) {
       setTimeout(() => profileNameInput?.focus(), 50);

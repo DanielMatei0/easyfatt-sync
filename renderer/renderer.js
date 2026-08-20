@@ -825,7 +825,7 @@ function bindExternalLinks() {
 function setLegalGateVisible(visible) {
   if (!legalGate || !appShell) return;
   legalGate.hidden = !visible;
-  appShell.classList.toggle("is-blocked", visible);
+  window.shellBlock?.set("legal", visible);
   document.body.classList.toggle("legal-gate-open", visible);
 }
 
@@ -1162,7 +1162,7 @@ function resetSupportForm() {
 function setSupportModalVisible(visible) {
   if (!supportModal || !appShell) return;
   supportModal.hidden = !visible;
-  appShell.classList.toggle("is-blocked", visible);
+  window.shellBlock?.set("support", visible);
   document.body.classList.toggle("support-modal-open", visible);
 
   if (visible) {
@@ -1222,7 +1222,7 @@ function setBackupRestoreModalVisible(visible) {
   backupRestoreModal.hidden = !visible;
 
   if (visible) {
-    appShell?.classList.add("is-blocked");
+    window.shellBlock?.acquire("backup");
     document.body.classList.add("backup-restore-modal-open");
     return;
   }
@@ -1230,11 +1230,8 @@ function setBackupRestoreModalVisible(visible) {
   pendingRestorePath = null;
   if (backupRestoreModalHint) backupRestoreModalHint.textContent = "";
 
-  const supportOpen = supportModal && !supportModal.hidden;
-  const legalOpen = legalGate && !legalGate.hidden;
-  if (!supportOpen && !legalOpen) {
-    appShell?.classList.remove("is-blocked");
-  }
+  // Il contatore gestisce la sovrapposizione con gli altri modali: nessuna guardia manuale.
+  window.shellBlock?.release("backup");
 
   document.body.classList.remove("backup-restore-modal-open");
 }

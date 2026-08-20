@@ -52,6 +52,15 @@ function buildVariableMap(customer, businessProfile, extra = {}) {
     birthday = c.birthDate.toLocaleDateString("it-IT", { day: "numeric", month: "long" });
   }
 
+  const reward = extra.reward || "un omaggio speciale";
+  // {{soglia}} = soglia punti superata (fallback ai punti reali); {{premio}} = alias di {{reward}}.
+  const soglia =
+    extra.threshold != null && extra.threshold !== ""
+      ? String(extra.threshold)
+      : c.points != null
+        ? String(c.points)
+        : "100";
+
   return {
     firstName: c.firstName || "Mario",
     lastName: c.lastName || "Rossi",
@@ -59,7 +68,9 @@ function buildVariableMap(customer, businessProfile, extra = {}) {
     businessName,
     fidelityCardNumber: c.fidelityCardNumber || "FID-12345",
     birthday: birthday || "15 maggio",
-    reward: extra.reward || "un omaggio speciale",
+    reward,
+    premio: reward,
+    soglia,
   };
 }
 

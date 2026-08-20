@@ -985,10 +985,9 @@
                     <thead>
                       <tr>
                         <th>Automazione</th>
-                        <th>Destinatario</th>
-                        <th>Stato</th>
+                        <th>Destinatari</th>
+                        <th>Esito</th>
                         <th>Data</th>
-                        <th>Dettaglio</th>
                       </tr>
                     </thead>
                     <tbody id="marketingHistoryBody"></tbody>
@@ -1757,9 +1756,7 @@
       <div class="mkt-table-wrap mkt-recipients-table-wrap">
         <table class="mkt-table">
           <thead>
-            <tr>
-              <th>Destinatario</th>
-              <th>Email</th>
+            <tr id="marketingRecipientsHeadRow">
               <th>Stato</th>
               <th>Dettaglio</th>
             </tr>
@@ -1775,6 +1772,30 @@
         <button type="button" id="marketingRecipientsSimulateBtn" class="btn btn-primary">Simula invio</button>
         <button type="button" id="marketingRecipientsSendRealBtn" class="btn btn-primary" hidden>Invia email reali</button>
       </footer>
+    </div>
+  </div>
+
+  <!-- MARKETING: DESTINATARI DI UN INVIO (batch) -->
+  <div id="marketingBatchOverlay" class="mkt-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="marketingBatchTitle">
+    <div class="mkt-modal mkt-modal-wide" role="document">
+      <header class="mkt-modal-head">
+        <div class="mkt-modal-head-text">
+          <h2 id="marketingBatchTitle" class="mkt-modal-title">Destinatari dell'invio</h2>
+          <p id="marketingBatchSub" class="mkt-modal-sub">—</p>
+        </div>
+        <button type="button" id="marketingBatchCloseBtn" class="mkt-modal-close" aria-label="Chiudi">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </header>
+      <div class="mkt-table-wrap mkt-recipients-table-wrap">
+        <table class="mkt-table">
+          <thead>
+            <tr><th>Destinatario</th><th>Email</th><th>Punti</th><th>Stato</th><th>Dettaglio</th></tr>
+          </thead>
+          <tbody id="marketingBatchBody"></tbody>
+        </table>
+        <p id="marketingBatchEmpty" class="mkt-inline-empty" hidden>Nessun destinatario per questo invio.</p>
+      </div>
     </div>
   </div>
 
@@ -1893,6 +1914,7 @@
 
   <div id="marketingToastHost" class="mkt-toast-host" aria-live="polite" aria-atomic="true"></div>
 
+  <script src="./shell-block.js"></script>
   <script src="./telemetry.js"></script>
   <script src="./dashboard-ui.js"></script>
   <script src="./history-ui.js"></script>

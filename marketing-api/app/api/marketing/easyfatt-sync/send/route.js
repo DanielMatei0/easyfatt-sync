@@ -111,7 +111,8 @@ export async function POST(request) {
       try {
         const customer = customerFromRecipient(recipient, bp);
         const rendered = renderMarketingEmail(template, marketingConfig, customer, {
-          reward: recipient.variables?.reward,
+          reward: recipient.variables?.premio || recipient.variables?.reward,
+          threshold: recipient.variables?.soglia,
           businessName: bp.businessName,
         });
 

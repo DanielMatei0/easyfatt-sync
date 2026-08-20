@@ -791,7 +791,13 @@
             <div><dt>Template</dt><dd>${escapeHtml(tpl?.name || "—")}</dd></div>
             <div><dt>Profilo</dt><dd>${escapeHtml(getMarketingProfileName(a.marketingProfileId))}</dd></div>
             <div><dt>Ultima esecuzione</dt><dd>${lastRun ? fmtDate(lastRun) : "Mai"}</dd></div>
-            <div><dt>Ultima simulazione</dt><dd>${lastCount != null ? `${lastCount} destinatari` : "—"}</dd></div>
+            <div><dt>Ultima simulazione</dt><dd>${
+              lastCount != null
+                ? latestBatchIdFor(a.id)
+                  ? `<button type="button" class="mkt-link-count" data-batch-id="${escapeHtml(latestBatchIdFor(a.id))}" data-batch-title="${escapeHtml(a.name || "")}">${lastCount} destinatari</button>`
+                  : `${lastCount} destinatari`
+                : "—"
+            }</dd></div>
             <div><dt>Modalità</dt><dd>${escapeHtml(scheduleLabel)}</dd></div>
           </dl>
           <footer class="mkt-auto-card-foot">
@@ -995,6 +1001,35 @@
     }
   }
 
+  function automationLabel(automationId) {
+    if (automationId === "__test__") return "Email di test";
+    const auto = (marketingConfig?.automations || []).find((a) => a.id === automationId);
+    if (auto) return auto.name;
+    if (marketingConfig?.deletedAutomationNames?.[automationId]) {
+      return `${marketingConfig.deletedAutomationNames[automationId]} (eliminata)`;
+    }
+    return "Automazione eliminata";
+  }
+
+  // Raggruppa la cronologia per invio (batchId). Entry senza batchId → gruppo singolo.
+  function groupHistoryByBatch(history) {
+    const groups = [];
+    const byKey = new Map();
+    (history || []).forEach((h) => {
+      const batchId = h.batchId || h.meta?.batchId || "";
+      const key = batchId || `single:${h.id}`;
+      let g = byKey.get(key);
+      if (!g) {
+        g = { key, batchId, automationId: h.automationId, sentAt: h.sentAt, entries: [] };
+        byKey.set(key, g);
+        groups.push(g);
+      }
+      g.entries.push(h);
+      if (new Date(h.sentAt).getTime() > new Date(g.sentAt).getTime()) g.sentAt = h.sentAt;
+    });
+    return groups;
+  }
+
   function renderHistory() {
     const tbody = $("marketingHistoryBody");
     const table = $("marketingHistoryTable");
@@ -1003,26 +1038,87 @@
     const history = marketingConfig?.sendHistory || [];
     if (empty) empty.hidden = history.length > 0;
     if (table) table.hidden = history.length === 0;
-    tbody.innerHTML = history
-      .slice(0, 100)
-      .map((h) => {
-        const auto = (marketingConfig.automations || []).find((a) => a.id === h.automationId);
-        let autoName = "Automazione eliminata";
-        if (h.automationId === "__test__") autoName = "Email di test";
-        else if (auto) autoName = auto.name;
-        else if (marketingConfig.deletedAutomationNames?.[h.automationId]) {
-          autoName = `${marketingConfig.deletedAutomationNames[h.automationId]} (eliminata)`;
+
+    const groups = groupHistoryByBatch(history).slice(0, 100);
+    tbody.innerHTML = groups
+      .map((g) => {
+        const autoName = automationLabel(g.automationId);
+        const counts = { sent: 0, simulated: 0, skipped: 0, failed: 0 };
+        g.entries.forEach((e) => {
+          counts[e.status] = (counts[e.status] || 0) + 1;
+        });
+        const pills = [
+          counts.sent ? `<span class="mkt-status-pill" data-status="sent">${counts.sent} inviate</span>` : "",
+          counts.simulated ? `<span class="mkt-status-pill" data-status="simulated">${counts.simulated} simulate</span>` : "",
+          counts.failed ? `<span class="mkt-status-pill" data-status="failed">${counts.failed} errori</span>` : "",
+          counts.skipped ? `<span class="mkt-status-pill" data-status="skipped">${counts.skipped} saltati</span>` : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        const total = g.entries.length;
+        const label = `${total} ${total === 1 ? "destinatario" : "destinatari"}`;
+        let countCell;
+        if (g.batchId) {
+          countCell = `<button type="button" class="mkt-link-count" data-batch-id="${escapeHtml(g.batchId)}" data-batch-title="${escapeHtml(autoName)}">${label}</button>`;
+        } else if (total === 1) {
+          // Entry storiche senza batch: mostra direttamente il destinatario.
+          const h = g.entries[0];
+          countCell = `<strong>${escapeHtml(h.recipientEmail)}</strong>${h.recipientName ? `<br><span class="muted-text">${escapeHtml(h.recipientName)}</span>` : ""}`;
+        } else {
+          countCell = label;
         }
-        const status = STATUS_LABELS[h.status] || h.status;
-        return `<tr data-status="${escapeHtml(h.status)}">
+        return `<tr>
           <td>${escapeHtml(autoName)}</td>
-          <td><strong>${escapeHtml(h.recipientEmail)}</strong>${h.recipientName ? `<br><span class="muted-text">${escapeHtml(h.recipientName)}</span>` : ""}</td>
-          <td><span class="mkt-status-pill" data-status="${escapeHtml(h.status)}">${escapeHtml(status)}</span></td>
-          <td>${fmtDate(h.sentAt)}</td>
-          <td class="muted-text">${escapeHtml(h.reason || "—")}</td>
+          <td>${countCell}</td>
+          <td>${pills || "—"}</td>
+          <td>${fmtDate(g.sentAt)}</td>
         </tr>`;
       })
       .join("");
+  }
+
+  /* ── Modale "Destinatari dell'invio" (per batch) ─────────────── */
+  function openBatchModal(batchId, title) {
+    if (!batchId) return;
+    const overlay = $("marketingBatchOverlay");
+    const body = $("marketingBatchBody");
+    const emptyEl = $("marketingBatchEmpty");
+    const sub = $("marketingBatchSub");
+    const entries = (marketingConfig?.sendHistory || []).filter(
+      (h) => (h.batchId || h.meta?.batchId) === batchId
+    );
+    if (sub) {
+      const when = entries[0] ? fmtDate(entries[0].sentAt) : "";
+      sub.textContent = `${title || automationLabel(entries[0]?.automationId)} · ${entries.length} destinatari${when ? ` · ${when}` : ""}`;
+    }
+    if (body) {
+      body.innerHTML = entries
+        .map((h) => {
+          const pts = h.meta?.points;
+          return `<tr data-status="${escapeHtml(h.status)}">
+            <td>${escapeHtml(h.recipientName || "—")}</td>
+            <td>${escapeHtml(h.recipientEmail)}</td>
+            <td>${pts != null && pts !== "" ? escapeHtml(String(pts)) : "—"}</td>
+            <td><span class="mkt-status-pill" data-status="${escapeHtml(h.status)}">${escapeHtml(STATUS_LABELS[h.status] || h.status)}</span></td>
+            <td class="muted-text">${escapeHtml(h.reason || "—")}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+    if (emptyEl) emptyEl.hidden = entries.length > 0;
+    setOverlayOpen(overlay, true);
+  }
+
+  function closeBatchModal() {
+    setOverlayOpen($("marketingBatchOverlay"), false);
+  }
+
+  // Ultimo batch di un'automazione (per la card).
+  function latestBatchIdFor(automationId) {
+    const entry = (marketingConfig?.sendHistory || []).find(
+      (h) => h.automationId === automationId && (h.batchId || h.meta?.batchId)
+    );
+    return entry ? entry.batchId || entry.meta?.batchId : "";
   }
 
   async function refreshBrandLogoPreview() {
@@ -1494,21 +1590,29 @@
           <li class="mkt-recipient-stat"><span class="stat-label">Già contattati</span><span class="stat-value">${s.alreadyContacted ?? 0}</span></li>
           <li class="mkt-recipient-stat"><span class="stat-label">Saltati</span><span class="stat-value">${s.skipped}</span></li>`;
       }
+      // Colonne dinamiche: tutte le intestazioni dell'Excel, oltre a Stato/Dettaglio.
+      const headers = Array.isArray(data?.headers) ? data.headers : [];
+      const headRow = $("marketingRecipientsHeadRow");
+      if (headRow) {
+        headRow.innerHTML =
+          `<th>Stato</th><th>Dettaglio</th>` +
+          headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("");
+      }
+      const cellsFor = (rowData) =>
+        headers.map((h) => `<td>${escapeHtml(String(rowData?.[h] ?? ""))}</td>`).join("");
       const rows = [
         ...(data?.recipients || []).map(
           (r) => `<tr class="mkt-row-valid">
-            <td>${escapeHtml(r.name || "—")}</td>
-            <td>${escapeHtml(r.email)}</td>
             <td><span class="mkt-status-pill" data-status="simulated">Valido</span></td>
             <td class="muted-text">Pronto per simulazione</td>
+            ${cellsFor(r.row)}
           </tr>`
         ),
         ...(data?.skipped || []).map(
           (s) => `<tr class="mkt-row-skipped">
-            <td>${escapeHtml(s.name || "—")}</td>
-            <td>${escapeHtml(s.email)}</td>
             <td><span class="mkt-status-pill" data-status="skipped">Saltato</span></td>
             <td class="muted-text">${escapeHtml(s.reason)}</td>
+            ${cellsFor(s.row)}
           </tr>`
         ),
       ];
@@ -1597,8 +1701,12 @@
           `<tr data-status="${escapeHtml(r.status)}"><td>${escapeHtml(r.email)}</td><td><span class="mkt-status-pill" data-status="${escapeHtml(r.status)}">${escapeHtml(r.status)}</span></td><td class="muted-text">${escapeHtml(r.reason || "—")}</td></tr>`
       )
       .join("");
+    const count = res?.recipientsCount ?? (res?.results || []).length;
+    const countLink = res?.batchId
+      ? ` — <button type="button" class="mkt-link-count" data-batch-id="${escapeHtml(res.batchId)}" data-batch-title="Invio">${count} ${count === 1 ? "destinatario" : "destinatari"}</button>`
+      : "";
     el.innerHTML = `
-      <p class="mkt-send-results-msg">${escapeHtml(res?.message || "")}</p>
+      <p class="mkt-send-results-msg">${escapeHtml(res?.message || "")}${countLink}</p>
       <div class="table-wrap mkt-recipients-table-wrap">
         <table class="data-table"><thead><tr><th>Email</th><th>Esito</th><th>Dettaglio</th></tr></thead>
         <tbody>${rows || "<tr><td colspan=\"3\">Nessun risultato</td></tr>"}</tbody></table>
@@ -1958,8 +2066,19 @@
     $("marketingWizardFinishBtn")?.addEventListener("click", finishWizard);
 
     $("marketingTemplateCloseBtn")?.addEventListener("click", closeTemplateModal);
+    $("marketingBatchCloseBtn")?.addEventListener("click", closeBatchModal);
 
     document.addEventListener("click", (e) => {
+      const countBtn = e.target.closest(".mkt-link-count[data-batch-id]");
+      if (countBtn) {
+        e.preventDefault();
+        openBatchModal(
+          countBtn.getAttribute("data-batch-id"),
+          countBtn.getAttribute("data-batch-title")
+        );
+        return;
+      }
+
       const saveSender = e.target.closest("#marketingSaveSenderBtn");
       if (saveSender) {
         e.preventDefault();
