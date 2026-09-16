@@ -98,6 +98,7 @@ function createClient(store, { onUnauthorized } = {}) {
     deliver: (body) => call("POST", "/sends/deliver", body, { timeoutMs: 60000 }),
     listSends: (params = {}) => call("GET", `/sends?${new URLSearchParams(params)}`),
     sender: (body) => call("POST", "/sender", body, { timeoutMs: 60000 }),
+    telemetry: (body) => call("POST", "/telemetry", body),
     requestPasswordCode: () => call("POST", "/account/password/code", {}),
     setPassword: (code, new_password) => call("POST", "/account/password", { code, new_password }),
   };

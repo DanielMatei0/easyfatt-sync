@@ -12,8 +12,19 @@ const configSync = require("./configSync");
 const pending = require("./pendingStore");
 const { createRunner, events: runnerEvents } = require("./marketingRunner");
 const { previewAutomation } = require("./preview");
+const { createTelemetry } = require("./telemetry");
 
-function createCloudService({ store, app, log = () => {}, broadcast = () => {}, getAppConfig, getInstallId }) {
+function createCloudService({
+  store,
+  app,
+  log = () => {},
+  broadcast = () => {},
+  getAppConfig,
+  getInstallId,
+  isWindowFocused = () => false,
+  getIdleSeconds = () => 0,
+  onConfigPulled = () => {},
+}) {
   let lastError = null;
   let lastRun = store.get("cloud.lastRun") || null;
   let migrating = null;
@@ -34,6 +45,17 @@ function createCloudService({ store, app, log = () => {}, broadcast = () => {}, 
     return Boolean(tokenStore.sessionInfo(store));
   }
 
+  function isManagementOnly() {
+    const marketing = getMarketingConfig(store);
+    const appConfig = getAppConfig();
+    const profiles = marketing.marketingProfiles || [];
+    if (!profiles.length) return false;
+    return !profiles.some((p) => {
+      const sp = (appConfig.syncProfiles || []).find((x) => x.id === p.syncProfileId);
+      return sp?.excelPath && require("fs").existsSync(sp.excelPath);
+    });
+  }
+
   function status() {
     const session = tokenStore.sessionInfo(store);
     return {
@@ -46,6 +68,7 @@ function createCloudService({ store, app, log = () => {}, broadcast = () => {}, 
       config: configSync.state(store),
       pendingConfirms: pending.count(store),
       marketingPaused: shopFlags ? shopFlags.marketing_paused : null,
+      managementOnly: Boolean(session) && isManagementOnly(),
       lastRun,
       lastError,
     };
@@ -62,11 +85,38 @@ function createCloudService({ store, app, log = () => {}, broadcast = () => {}, 
     engine,
     log,
     shopId: () => tokenStore.sessionInfo(store)?.shop?.id,
+    hasCustomerFile: (marketing, automation) => {
+      const profile = (marketing.marketingProfiles || []).find((p) => p.id === automation.marketingProfileId);
+      const syncProfile = profile && (getAppConfig().syncProfiles || []).find((p) => p.id === profile.syncProfileId);
+      return Boolean(syncProfile?.excelPath && require("fs").existsSync(syncProfile.excelPath));
+    },
     gate: () => {
       if (!isConnected()) return { ok: false, reason: "not_connected" };
       if (!migration.isDone(store)) return { ok: false, reason: "migration_pending" };
       return { ok: true };
     },
+  });
+
+  /** Scarica la config se un altro PC (es. da remoto) l'ha cambiata. */
+  async function pullConfigIfNewer(serverVersion) {
+    if (!isConnected() || !migration.isDone(store)) return;
+    const local = configSync.state(store);
+    if (typeof serverVersion === "number" && serverVersion <= local.version && !local.dirty) return;
+    const r = await configSync.sync(store, client);
+    if (r.pulled) {
+      log("[Account] Configurazione aggiornata da un altro PC.");
+      broadcast("marketing-updated", getMarketingConfig(store));
+      onConfigPulled();
+    }
+  }
+
+  const telemetry = createTelemetry({
+    store,
+    client,
+    isConnected: () => isConnected(),
+    isWindowFocused,
+    getIdleSeconds,
+    onServerConfigVersion: (v) => pullConfigIfNewer(v).catch(() => {}),
   });
 
   runnerEvents.on("run-finished", () => {
@@ -117,6 +167,7 @@ function createCloudService({ store, app, log = () => {}, broadcast = () => {}, 
     emitStatus();
     await refreshMe().catch(() => {});
     if (!migration.isDone(store)) await migrate();
+    telemetry.flush();
     return status();
   }
 
@@ -133,12 +184,16 @@ function createCloudService({ store, app, log = () => {}, broadcast = () => {}, 
   }
 
   async function startup() {
+    telemetry.start();
     if (!isConnected()) return;
     try {
       await refreshMe();
       if (migration.isDone(store)) {
         const r = await configSync.sync(store, client);
-        if (r.pulled) broadcast("marketing-updated", getMarketingConfig(store));
+        if (r.pulled) {
+          broadcast("marketing-updated", getMarketingConfig(store));
+          onConfigPulled();
+        }
       }
     } catch (err) {
       lastError = err instanceof CloudError && err.kind === "offline" ? "Server non raggiungibile: invii in pausa." : err.message;
@@ -147,6 +202,8 @@ function createCloudService({ store, app, log = () => {}, broadcast = () => {}, 
   }
 
   async function runMarketing(options) {
+    // Prima di valutare: modifiche fatte da un altro PC arrivano subito, non al riavvio.
+    await pullConfigIfNewer().catch(() => {});
     const result = await runner.runMarketing(options);
     if (result && !result.skipped) {
       lastRun = { at: new Date().toISOString(), ok: result.ok, summary: result.summary || null, message: result.message || null };
@@ -202,6 +259,8 @@ function createCloudService({ store, app, log = () => {}, broadcast = () => {}, 
     preview,
     saveMarketing,
     listSends: (params) => client.listSends(params),
+    recordSync: (event) => telemetry.recordSync(event),
+    flushTelemetry: () => telemetry.flush(),
     verifySender: (body) => client.sender(body),
     requestPasswordCode: () => client.requestPasswordCode(),
     setPassword: async (code, password) => {

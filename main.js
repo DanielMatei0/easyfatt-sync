@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, powerMonitor } = require("electron");
 const path = require("path");
 const Store = require("electron-store");
 const {
@@ -19,6 +19,7 @@ const {
   runSyncAll,
   setPostMarketingHook,
   setMarketingRunner: setSyncMarketingRunner,
+  setSyncEventHook,
 } = require("./src/main/syncRunner");
 const {
   mergeConfig,
@@ -327,7 +328,12 @@ const cloud = createCloudService({
   },
   getAppConfig: () => ensureConfigMigrated(store.get("config") || getDefaultConfig()),
   getInstallId: () => getInstallId(),
+  isWindowFocused: () => Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()),
+  getIdleSeconds: () => powerMonitor.getSystemIdleTime(),
+  // Config cambiata da un altro PC (es. gestione da remoto): gli orari programmati vanno riletti.
+  onConfigPulled: () => restartScheduler(ensureConfigMigrated(store.get("config") || getDefaultConfig())),
 });
+setSyncEventHook((event) => cloud.recordSync(event));
 setSyncMarketingRunner((options) => cloud.runMarketing(options));
 setSchedulerMarketingRunner((options) => cloud.runMarketing(options));
 

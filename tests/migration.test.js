@@ -93,6 +93,7 @@ test("secondo PC: il negozio è già sul server, si scarica la config", async ()
   assert.equal(r.mode, "joined");
   assert.equal(getMarketingConfig(s.store).templates[0].name, "Dal server");
   assert.ok(!s.cloud.calls.includes("migrationStart"));
+  assert.equal(s.cloud.sends.size, 0, "lo storico di un PC estraneo non entra nel registro del negozio");
 });
 
 test("migrazione interrotta e ripresa: nessun doppione", async () => {

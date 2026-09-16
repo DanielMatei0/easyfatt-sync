@@ -303,8 +303,12 @@ function createRunner(deps) {
     if (options.trigger !== "manual" && options.syncProfileId && marketing.runMarketingAfterSync === false) {
       return { ok: true, skipped: true, reason: "run_after_sync_disabled" };
     }
-    const automations = selectAutomations(marketing, options);
-    if (!automations.length) return { ok: true, skipped: true, reason: "no_automations" };
+    const selected = selectAutomations(marketing, options);
+    if (!selected.length) return { ok: true, skipped: true, reason: "no_automations" };
+    // Un PC senza il file clienti (es. il PC da cui si gestiscono le campagne da
+    // remoto) non invia: lo fanno i PC del negozio che hanno l'Excel.
+    const automations = deps.hasCustomerFile ? selected.filter((a) => deps.hasCustomerFile(marketing, a)) : selected;
+    if (!automations.length) return { ok: true, skipped: true, reason: "management_only" };
 
     await flushPending();
 
@@ -353,6 +357,10 @@ function createRunner(deps) {
         return await runOnce(options);
       } catch (err) {
         const kind = err instanceof CloudError ? err.kind : "error";
+        if (kind === "busy") {
+          log(`[Marketing] ${err.message} Questo PC salta il giro.`);
+          return { ok: true, skipped: true, reason: "busy_other_device", message: err.message };
+        }
         if (!(err instanceof CloudError)) log(`[Marketing] Errore: ${err.message}`);
         else log(`[Marketing] Invii non eseguiti: ${err.message}`);
         return { ok: false, kind, message: err.message };

@@ -80,6 +80,21 @@ let syncInProgress = false;
 let syncQueue = Promise.resolve();
 let postMarketingHook = null;
 let marketingRunner = null;
+let syncEventHook = null;
+
+/** Notifica ogni sincronizzazione eseguita (per le metriche del server). */
+function setSyncEventHook(fn) {
+  syncEventHook = typeof fn === "function" ? fn : null;
+}
+
+function emitSyncEvent(event) {
+  if (!syncEventHook) return;
+  try {
+    syncEventHook(event);
+  } catch {
+    /* le metriche non fermano mai una sync */
+  }
+}
 
 function setPostMarketingHook(fn) {
   postMarketingHook = typeof fn === "function" ? fn : null;
@@ -213,6 +228,7 @@ async function runSyncInternal(profile, log, store, options = {}) {
       }
     }
 
+    emitSyncEvent({ profileId, profileName, trigger, status: "SUCCESS", rows, durationMs, startedAt });
     recordSyncEvent(store, {
       profileId,
       profileName,
@@ -252,6 +268,7 @@ async function runSyncInternal(profile, log, store, options = {}) {
     const clientMessage = toClientMessage(error, "sync");
     const durationMs = Date.now() - startedAt;
 
+    emitSyncEvent({ profileId, profileName, trigger, status: "ERROR", rows: 0, durationMs, startedAt, error: clientMessage });
     recordSyncEvent(store, {
       profileId,
       profileName,
@@ -323,4 +340,5 @@ module.exports = {
   isSyncInProgress,
   setPostMarketingHook,
   setMarketingRunner,
+  setSyncEventHook,
 };

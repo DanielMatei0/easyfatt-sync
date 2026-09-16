@@ -116,7 +116,10 @@ async function runMigration(deps) {
     progress("joining", "Scarico la configurazione del negozio");
     if (!getState(store).backupPath) setState(store, { backupPath: writeLocalBackup(store, deps.userDataDir) });
     const remote = await client.getConfig();
-    const ledger = legacyLedger(marketing, shopId);
+    // Solo gli invii delle automazioni del negozio: un PC dello staff o di prova
+    // non deve riversare il proprio storico nel registro del cliente.
+    const remoteIds = new Set((remote.config?.marketing?.automations || []).map((a) => a.id));
+    const ledger = legacyLedger(marketing, shopId).filter((e) => remoteIds.has(e.automation_id));
     for (const part of chunk(ledger, 1000)) await client.migrationLedger(undefined, part);
     configSync.applyServerConfig(store, remote.config, remote.version);
     setState(store, { step: "done", mode: "joined", completedAt: new Date().toISOString() });

@@ -9,7 +9,7 @@ const engine = require("../src/main/marketingEngine");
 const SHOP = "shop-test";
 const ACTIVATED = new Date(Date.now() - 86400000).toISOString();
 
-function setup({ rows, automations, sender, cloudOptions } = {}) {
+function setup({ rows, automations, sender, cloudOptions, hasCustomerFile } = {}) {
   const store = createMemoryStore();
   setMarketingConfig(store, {
     enabled: true,
@@ -45,6 +45,7 @@ function setup({ rows, automations, sender, cloudOptions } = {}) {
       buildRecipientVariables: engine.buildRecipientVariables,
     },
     createSender: sender ? () => sender(gmail) : defaultSender,
+    hasCustomerFile,
   });
   return { store, cloud, runner, state, gmail };
 }
@@ -171,4 +172,22 @@ test("più di 50 destinatari: partono tutti, nei giri successivi se serve", asyn
   held.forEach((e) => (e.status = "QUEUED"));
   await s.runner.runMarketing({ trigger: "manual" });
   assert.equal(s.gmail.sent.length, 60);
+});
+
+test("PC di sola gestione (senza file clienti): nessun giro, nessun invio", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto], hasCustomerFile: () => false });
+  const r = await s.runner.runMarketing({ trigger: "schedule" });
+  assert.equal(r.reason, "management_only");
+  assert.equal(s.cloud.calls.length, 0);
+});
+
+test("un altro PC del negozio sta già inviando: questo salta il giro senza errore", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto] });
+  const { CloudError } = require("../src/main/cloud/cloudApi");
+  s.cloud.client.startRun = async () => {
+    throw new CloudError("busy", "Invio già in corso da «PC Cassa».", { status: 409, code: "busy" });
+  };
+  const r = await s.runner.runMarketing({ trigger: "schedule" });
+  assert.equal(r.ok, true);
+  assert.equal(r.reason, "busy_other_device");
 });

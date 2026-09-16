@@ -54,7 +54,7 @@
     show("cloudLoginBtn", !s.connected && !loggingIn);
     show("cloudCancelLoginBtn", loggingIn);
     show("cloudMigrateBtn", inMigration && !s.migrating);
-    show("cloudRunNowBtn", s.connected && migrationDone);
+    show("cloudRunNowBtn", s.connected && migrationDone && !s.managementOnly);
     show("cloudPasswordBtn", s.connected && migrationDone);
     show("cloudLogoutBtn", s.connected && !s.migrating);
     show("cloudAccountSteps", inMigration);
@@ -100,6 +100,7 @@
         sum ? `Ultimo giro ${fmt(s.lastRun.at)}: ${sum.sent} inviate${sum.failed ? `, ${sum.failed} non riuscite` : ""}` : `Ultimo giro ${fmt(s.lastRun.at)}`,
       );
     }
+    if (s.managementOnly) parts.push("Solo gestione: su questo PC non c'è il file clienti, le email partono dai PC del negozio");
     if (s.pendingConfirms) parts.push(`${s.pendingConfirms} esiti da confermare al server`);
     text("cloudAccountDesc", parts.join(" — "));
     text("cloudPasswordBtn", s.user?.has_password ? "Cambia password" : "Imposta password");
