@@ -79,42 +79,30 @@ function basenameSafe(p) {
 let syncInProgress = false;
 let syncQueue = Promise.resolve();
 let postMarketingHook = null;
+let marketingRunner = null;
 
 function setPostMarketingHook(fn) {
   postMarketingHook = typeof fn === "function" ? fn : null;
+}
+
+/** Giro marketing (cloud/marketingRunner) iniettato da main.js. */
+function setMarketingRunner(fn) {
+  marketingRunner = typeof fn === "function" ? fn : null;
 }
 
 async function runMarketingAfterSyncIfNeeded(store, profileId, log, trigger) {
   // Include "manual": quando la cliente sincronizza a mano (es. dopo aver creato
   // una gift card), le automazioni collegate devono comunque partire.
   const marketingTriggers = new Set(["watch", "schedule", "auto", "manual"]);
-  if (!marketingTriggers.has(trigger)) return null;
+  if (!marketingTriggers.has(trigger) || !marketingRunner) return null;
 
   try {
-    const { processMarketingAfterSync } = require("./marketingEngine");
-    const { ensureConfigMigrated } = require("./syncState");
-    const appConfig = ensureConfigMigrated(store.get("config") || {});
-    let appVersion = "";
-    try {
-      appVersion = require("../../package.json").version || "";
-    } catch {
-      /* ignore */
-    }
-
-    const result = await processMarketingAfterSync(store, appConfig, profileId, log, {
-      trigger,
-      appVersion,
-    });
-
-    if (postMarketingHook) {
-      try {
-        await postMarketingHook(result);
-      } catch {
-        /* ignore UI hook errors */
-      }
-    }
-
-    return result;
+    // Non attende: la sync è finita, il marketing gira per conto suo (con il suo lucchetto).
+    const result = marketingRunner({ trigger: trigger === "manual" ? "sync-manual" : trigger, syncProfileId: profileId });
+    Promise.resolve(result)
+      .then((r) => postMarketingHook && postMarketingHook(r))
+      .catch((error) => log(`[Marketing] Post-sync: ${error.message || "errore"}`));
+    return { started: true };
   } catch (error) {
     log(`[Marketing] Post-sync: ${error.message || "errore"}`);
     return null;
@@ -334,4 +322,5 @@ module.exports = {
   runSyncAll,
   isSyncInProgress,
   setPostMarketingHook,
+  setMarketingRunner,
 };

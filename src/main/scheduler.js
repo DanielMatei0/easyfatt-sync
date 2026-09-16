@@ -17,7 +17,13 @@ const {
 } = require("./syncState");
 const { createAutomaticBackup, isBackupInProgress } = require("./backup");
 const { getMarketingConfig, isAutomationRunnable } = require("./marketingConfig");
-const { simulateAutomationRun, executeAutomationSend } = require("./marketingEngine");
+
+let marketingRunner = null;
+
+/** Giro marketing (cloud/marketingRunner) iniettato da main.js. */
+function setMarketingRunner(fn) {
+  marketingRunner = typeof fn === "function" ? fn : null;
+}
 const { getDefaultConfig } = require("./syncState");
 
 const FILE_WATCH_DEBOUNCE_MS = 5000;
@@ -338,39 +344,21 @@ function scheduleMarketingDailyJobs(store, log) {
     const scheduled = scheduleCron(
       time,
       async () => {
-        if (isSyncInProgress()) {
-          log("[Marketing] Esecuzione programmata rimandata: sincronizzazione in corso.");
-          return;
-        }
-
-        const appConfig = ensureConfigMigrated(store.get("config") || getDefaultConfig());
+        // Niente più "rimandata" se c'è una sync in corso: il giro non si ripeteva
+        // e quel giorno i compleanni saltavano. Il runner ha il suo lucchetto.
         const latest = getMarketingConfig(store);
-        if (!latest.enabled) return;
+        if (!latest.enabled || !marketingRunner) return;
 
-        for (const automationId of automationIds) {
-          const automation = latest.automations.find((a) => a.id === automationId);
-          if (!automation || !isAutomationRunnable(automation)) continue;
-
-          try {
-            log(
-              `[Marketing] Esecuzione programmata ore ${time}: ${automation.name || automationId}`
-            );
-            const marketingCfg = getMarketingConfig(store);
-            if (marketingCfg.realSendEnabled) {
-              const pkg = require("../../package.json");
-              await executeAutomationSend(store, appConfig, automationId, {
-                dryRun: false,
-                consentConfirmed: true,
-                appVersion: pkg.version || "",
-              });
-            } else {
-              await simulateAutomationRun(store, appConfig, automationId, {
-                recordObservations: true,
-              });
-            }
-          } catch (error) {
-            log(`[Marketing] Errore su «${automation.name || automationId}»: ${error.message}`);
-          }
+        const ids = automationIds.filter((id) => {
+          const automation = latest.automations.find((a) => a.id === id);
+          return automation && isAutomationRunnable(automation);
+        });
+        if (!ids.length) return;
+        log(`[Marketing] Esecuzione programmata ore ${time}: ${ids.length} automazione/i.`);
+        try {
+          await marketingRunner({ trigger: "schedule", automationIds: ids });
+        } catch (error) {
+          log(`[Marketing] Errore esecuzione programmata: ${error.message}`);
         }
       },
       log,
@@ -410,6 +398,7 @@ function shouldStartScheduler(config, storeRef) {
 }
 
 module.exports = {
+  setMarketingRunner,
   startScheduler,
   stopScheduler,
   shouldStartScheduler,

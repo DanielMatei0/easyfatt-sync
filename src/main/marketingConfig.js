@@ -359,6 +359,10 @@ function normalizeAutomation(automation) {
       mode: schedule.mode === "daily" ? "daily" : "manual",
       time: String(schedule.time || "09:00").trim() || "09:00",
     },
+    // Da quando l'automazione è attiva: i clienti già noti prima non ricevono
+    // benvenuti né soglie "arretrate" (vedi cloud/marketingRules.js).
+    activatedAt: archived || a.enabled === false ? null : a.activatedAt || null,
+    lastSendAt: a.lastSendAt || null,
     lastSimulationAt: a.lastSimulationAt || null,
     lastSimulationRecipients:
       a.lastSimulationRecipients != null && !Number.isNaN(Number(a.lastSimulationRecipients))
@@ -403,7 +407,7 @@ function normalizeTemplate(template) {
     legacy: !!t.legacy || !!migrated.legacy,
     starterType: String(t.starterType || "").trim() || null,
     createdAt: t.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    updatedAt: t.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -499,6 +503,62 @@ function setMarketingConfig(store, config) {
   return normalized;
 }
 
+/** Chiavi che l'interfaccia può salvare. Storico e stato punti non si toccano mai da qui. */
+const PATCHABLE_KEYS = [
+  "enabled",
+  "senderName",
+  "senderEmail",
+  "senderVerification",
+  "businessName",
+  "replyToEmail",
+  "businessProfile",
+  "requireMarketingConsent",
+  "validConsentValues",
+  "marketingProfiles",
+  "automations",
+  "templates",
+  "deletedAutomationNames",
+  "automationWizardDraft",
+  "realSendEnabled",
+  "runMarketingAfterSync",
+];
+
+/**
+ * Salva le modifiche fatte dall'interfaccia sopra la config ATTUALE del PC.
+ * Prima il renderer rimandava la config intera letta minuti prima, cancellando
+ * gli invii registrati nel frattempo dal cron.
+ * Timbra `activatedAt` sulle automazioni che passano da spente ad attive.
+ */
+function patchMarketingConfig(store, patch, now = new Date()) {
+  const current = getMarketingConfig(store);
+  const next = { ...current };
+  PATCHABLE_KEYS.forEach((key) => {
+    if (patch && Object.prototype.hasOwnProperty.call(patch, key)) next[key] = patch[key];
+  });
+  if (Array.isArray(next.automations)) {
+    const before = new Map((current.automations || []).map((a) => [a.id, a]));
+    next.automations = next.automations.map((a) => {
+      const prev = before.get(a.id);
+      const active = a && a.enabled !== false && !a.archived;
+      const wasActive = prev && prev.enabled !== false && !prev.archived;
+      if (!active) return { ...a, activatedAt: null };
+      if (wasActive && prev.activatedAt) return { ...a, activatedAt: prev.activatedAt };
+      return { ...a, activatedAt: a.activatedAt && wasActive ? a.activatedAt : now.toISOString() };
+    });
+  }
+  return setMarketingConfig(store, next);
+}
+
+/** Alla migrazione: tutte le automazioni attive partono da adesso. */
+function stampActivation(config, now = new Date()) {
+  return {
+    ...config,
+    automations: (config.automations || []).map((a) =>
+      a.enabled !== false && !a.archived ? { ...a, activatedAt: a.activatedAt || now.toISOString() } : { ...a, activatedAt: null },
+    ),
+  };
+}
+
 function appendSendHistory(store, entries) {
   if (!entries?.length) return getMarketingConfig(store);
   const cfg = getMarketingConfig(store);
@@ -569,6 +629,9 @@ module.exports = {
   getDefaultMarketingConfig,
   getMarketingConfig,
   setMarketingConfig,
+  patchMarketingConfig,
+  stampActivation,
+  PATCHABLE_KEYS,
   normalizeMarketingConfig,
   normalizeMarketingProfile,
   normalizeAutomation,

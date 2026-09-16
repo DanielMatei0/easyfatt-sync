@@ -1,0 +1,174 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { createFakeCloud, createMemoryStore } = require("./helpers/fakeCloud");
+const { createRunner } = require("../src/main/cloud/marketingRunner");
+const { setMarketingConfig } = require("../src/main/marketingConfig");
+const rules = require("../src/main/cloud/marketingRules");
+const engine = require("../src/main/marketingEngine");
+
+const SHOP = "shop-test";
+const ACTIVATED = new Date(Date.now() - 86400000).toISOString();
+
+function setup({ rows, automations, sender, cloudOptions } = {}) {
+  const store = createMemoryStore();
+  setMarketingConfig(store, {
+    enabled: true,
+    realSendEnabled: true,
+    senderEmail: "negozio@gmail.com",
+    requireMarketingConsent: false,
+    marketingProfiles: [{ id: "mp1", syncProfileId: "sp1", name: "Clienti", columnMapping: {} }],
+    templates: [{ id: "t1", name: "T", subject: "Ciao {{firstName}}", blocks: [] }],
+    automations: automations.map((a) => ({ marketingProfileId: "mp1", templateId: "t1", enabled: true, activatedAt: ACTIVATED, ...a })),
+  });
+  const cloud = createFakeCloud(cloudOptions);
+  // Un cliente già noto: il server non è vuoto (migrazione fatta).
+  cloud.customers.set(rules.customerKey(SHOP, "storico@esempio.it"), { first_seen_at: ACTIVATED, last_points: 0, last_observed_at: ACTIVATED, points_rearm: {} });
+
+  const state = { rows };
+  const gmail = { sent: [] };
+  const defaultSender = () => ({
+    async preflight() {},
+    async sendOne(template, recipient) {
+      gmail.sent.push(recipient.email);
+      return { outcome: "SENT" };
+    },
+  });
+  const runner = createRunner({
+    store,
+    client: cloud.client,
+    getAppConfig: () => ({}),
+    gate: () => ({ ok: true }),
+    shopId: () => SHOP,
+    engine: {
+      loadCustomersForMarketingProfile: async () => ({ customers: state.rows.map((r) => ({ marketingConsent: "si", ...r })) }),
+      buildBackendBusinessProfile: engine.buildBackendBusinessProfile,
+      buildRecipientVariables: engine.buildRecipientVariables,
+    },
+    createSender: sender ? () => sender(gmail) : defaultSender,
+  });
+  return { store, cloud, runner, state, gmail };
+}
+
+const pointsAuto = { id: "auto_pts", type: "points_threshold", conditions: { pointsThresholds: [30, 60], multiCrossMode: "each" } };
+
+test("0 → 60 punti dal flusso reale: due email, poi più niente", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", firstName: "Anna", points: 0 }], automations: [pointsAuto] });
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 0);
+  s.state.rows = [{ email: "anna@esempio.it", firstName: "Anna", points: 60 }];
+  const r = await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(r.summary.sent, 2);
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 2);
+});
+
+test("due giri in parallelo: ogni mail parte una volta", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto] });
+  await Promise.all([s.runner.runMarketing({ trigger: "schedule" }), s.runner.runMarketing({ trigger: "watch" })]);
+  await new Promise((r) => setTimeout(r, 50));
+  await s.runner.runMarketing({ trigger: "schedule" });
+  assert.equal(s.gmail.sent.length, 2);
+});
+
+test("server non raggiungibile: nessun invio", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto] });
+  s.cloud.setOffline(true);
+  const r = await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(r.ok, false);
+  assert.equal(r.kind, "offline");
+  assert.equal(s.gmail.sent.length, 0);
+});
+
+test("negozio in pausa: nessun invio", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto], cloudOptions: { paused: true } });
+  const r = await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(r.kind, "paused");
+  assert.equal(s.gmail.sent.length, 0);
+});
+
+test("app chiusa durante l'invio: l'evento diventa incerto e non si reinvia", async () => {
+  let crash = true;
+  const s = setup({
+    rows: [{ email: "anna@esempio.it", points: 30 }],
+    automations: [{ ...pointsAuto, conditions: { pointsThresholds: [30] } }],
+    sender: (gmail) => ({
+      async preflight() {},
+      async sendOne(t, recipient) {
+        gmail.sent.push(recipient.email);
+        if (crash) throw new Error("processo terminato");
+        return { outcome: "SENT" };
+      },
+    }),
+  });
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 1);
+  crash = false;
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 1, "nessun reinvio automatico");
+  assert.equal([...s.cloud.sends.values()][0].status, "UNCERTAIN");
+});
+
+test("Google scaduto a metà: il resto torna in coda e parte al giro dopo, una volta", async () => {
+  let expire = true;
+  const s = setup({
+    rows: ["a", "b", "c"].map((x) => ({ email: `${x}@esempio.it`, points: 30 })),
+    automations: [{ ...pointsAuto, conditions: { pointsThresholds: [30] } }],
+    sender: (gmail) => ({
+      async preflight() {},
+      async sendOne(t, recipient) {
+        if (expire && gmail.sent.length === 1) return { outcome: "FAILED", kind: "auth", error: "token scaduto" };
+        gmail.sent.push(recipient.email);
+        return { outcome: "SENT" };
+      },
+    }),
+  });
+  const first = await s.runner.runMarketing({ trigger: "watch" });
+  assert.match(first.summary.stoppedBy, /Google/);
+  assert.equal(s.gmail.sent.length, 1);
+  expire = false;
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 3);
+  assert.equal(new Set(s.gmail.sent).size, 3);
+});
+
+test("Google non collegato prima di iniziare: nessuna presa in carico", async () => {
+  const s = setup({
+    rows: [{ email: "anna@esempio.it", points: 60 }],
+    automations: [pointsAuto],
+    sender: () => ({
+      async preflight() {
+        throw Object.assign(new Error("Ricollega Google"), { kind: "auth" });
+      },
+      async sendOne() {
+        throw new Error("non deve essere chiamato");
+      },
+    }),
+  });
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.ok([...s.cloud.sends.values()].every((e) => e.status === "QUEUED"));
+  assert.ok(!s.cloud.calls.includes("lease"));
+});
+
+test("invio reale spento: nessun giro sul server", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto] });
+  const { getMarketingConfig } = require("../src/main/marketingConfig");
+  setMarketingConfig(s.store, { ...getMarketingConfig(s.store), realSendEnabled: false });
+  const r = await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(r.reason, "real_send_disabled");
+  assert.equal(s.cloud.calls.length, 0);
+});
+
+test("più di 50 destinatari: partono tutti, nei giri successivi se serve", async () => {
+  const s = setup({
+    rows: Array.from({ length: 60 }, (_, i) => ({ email: `c${i}@esempio.it`, points: 30 })),
+    automations: [{ ...pointsAuto, conditions: { pointsThresholds: [30] } }],
+  });
+  // 60 clienti nuovi su 1 noto: la guardia li tratterrebbe se fossero benvenuti, non per le soglie…
+  // …ma il circuit breaker (>20% dei clienti) sì: li approviamo come farebbe lo staff.
+  await s.runner.runMarketing({ trigger: "watch" });
+  const held = [...s.cloud.sends.values()].filter((e) => e.status === "HELD");
+  assert.equal(held.length, 60);
+  held.forEach((e) => (e.status = "QUEUED"));
+  await s.runner.runMarketing({ trigger: "manual" });
+  assert.equal(s.gmail.sent.length, 60);
+});

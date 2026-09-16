@@ -374,7 +374,14 @@
       marketingConfig.senderName = partial.businessProfile.senderName || marketingConfig.senderName;
       marketingConfig.replyToEmail = partial.businessProfile.replyToEmail || marketingConfig.replyToEmail;
     }
-    const res = await api()?.saveMarketingConfig?.(marketingConfig);
+    // Solo le chiavi modificate: il main le applica sopra la config attuale.
+    const patch = { ...partial };
+    if (partial.businessProfile) {
+      patch.businessName = marketingConfig.businessName;
+      patch.senderName = marketingConfig.senderName;
+      patch.replyToEmail = marketingConfig.replyToEmail;
+    }
+    const res = await api()?.saveMarketingConfig?.(patch);
     if (res?.config) marketingConfig = res.config;
     renderAll();
     return marketingConfig;
@@ -1030,51 +1037,59 @@
     return groups;
   }
 
-  function renderHistory() {
+  const SERVER_STATUS = {
+    SENT: { pill: "sent", label: "Inviata" },
+    QUEUED: { pill: "simulated", label: "In coda" },
+    CLAIMED: { pill: "simulated", label: "In invio" },
+    HELD: { pill: "simulated", label: "In attesa di approvazione" },
+    FAILED: { pill: "failed", label: "Da ritentare" },
+    UNCERTAIN: { pill: "failed", label: "Esito incerto" },
+    DEAD: { pill: "failed", label: "Non riuscita" },
+    EXPIRED: { pill: "skipped", label: "Scaduta" },
+    CANCELLED: { pill: "skipped", label: "Annullata" },
+  };
+
+  let historyLoading = false;
+  let historyCursor = null;
+
+  async function renderHistory(append = false) {
     const tbody = $("marketingHistoryBody");
     const table = $("marketingHistoryTable");
     const empty = $("marketingHistoryEmpty");
-    if (!tbody) return;
-    const history = marketingConfig?.sendHistory || [];
-    if (empty) empty.hidden = history.length > 0;
-    if (table) table.hidden = history.length === 0;
-
-    const groups = groupHistoryByBatch(history).slice(0, 100);
-    tbody.innerHTML = groups
-      .map((g) => {
-        const autoName = automationLabel(g.automationId);
-        const counts = { sent: 0, simulated: 0, skipped: 0, failed: 0 };
-        g.entries.forEach((e) => {
-          counts[e.status] = (counts[e.status] || 0) + 1;
-        });
-        const pills = [
-          counts.sent ? `<span class="mkt-status-pill" data-status="sent">${counts.sent} inviate</span>` : "",
-          counts.simulated ? `<span class="mkt-status-pill" data-status="simulated">${counts.simulated} simulate</span>` : "",
-          counts.failed ? `<span class="mkt-status-pill" data-status="failed">${counts.failed} errori</span>` : "",
-          counts.skipped ? `<span class="mkt-status-pill" data-status="skipped">${counts.skipped} saltati</span>` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        const total = g.entries.length;
-        const label = `${total} ${total === 1 ? "destinatario" : "destinatari"}`;
-        let countCell;
-        if (g.batchId) {
-          countCell = `<button type="button" class="mkt-link-count" data-batch-id="${escapeHtml(g.batchId)}" data-batch-title="${escapeHtml(autoName)}">${label}</button>`;
-        } else if (total === 1) {
-          // Entry storiche senza batch: mostra direttamente il destinatario.
-          const h = g.entries[0];
-          countCell = `<strong>${escapeHtml(h.recipientEmail)}</strong>${h.recipientName ? `<br><span class="muted-text">${escapeHtml(h.recipientName)}</span>` : ""}`;
-        } else {
-          countCell = label;
-        }
-        return `<tr>
-          <td>${escapeHtml(autoName)}</td>
-          <td>${countCell}</td>
-          <td>${pills || "—"}</td>
-          <td>${fmtDate(g.sentAt)}</td>
+    const emptyText = $("marketingHistoryEmptyText");
+    if (!tbody || historyLoading) return;
+    historyLoading = true;
+    try {
+      const res = await api()?.listMarketingSends?.({ limit: 100, cursor: append ? historyCursor : undefined });
+      if (!res?.ok) {
+        if (!append) tbody.innerHTML = "";
+        if (emptyText) emptyText.textContent = res?.message || "Storico non disponibile: accedi con l'account Aven.";
+        if (empty) empty.hidden = false;
+        if (table) table.hidden = true;
+        return;
+      }
+      historyCursor = res.next_cursor;
+      const rows = (res.items || [])
+        .map((h) => {
+          const st = SERVER_STATUS[h.status] || { pill: "skipped", label: h.status };
+          const detail = h.last_error && h.status !== "SENT" ? `<br><span class="muted-text">${escapeHtml(h.last_error)}</span>` : "";
+          const soglia = h.meta && h.meta.soglia ? ` · soglia ${escapeHtml(String(h.meta.soglia))}` : "";
+          return `<tr>
+          <td>${escapeHtml(automationLabel(h.automation_id))}${soglia}${h.source === "MIGRATION" ? '<br><span class="muted-text">da versione precedente</span>' : ""}</td>
+          <td><strong>${escapeHtml(h.email)}</strong>${h.recipient_name ? `<br><span class="muted-text">${escapeHtml(h.recipient_name)}</span>` : ""}</td>
+          <td><span class="mkt-status-pill" data-status="${st.pill}">${escapeHtml(st.label)}</span>${detail}</td>
+          <td>${fmtDate(h.sent_at || h.created_at)}</td>
         </tr>`;
-      })
-      .join("");
+        })
+        .join("");
+      tbody.innerHTML = append ? tbody.innerHTML + rows : rows;
+      const hasRows = tbody.children.length > 0;
+      if (emptyText) emptyText.textContent = "Nessun invio registrato per ora.";
+      if (empty) empty.hidden = hasRows;
+      if (table) table.hidden = !hasRows;
+    } finally {
+      historyLoading = false;
+    }
   }
 
   /* ── Modale "Destinatari dell'invio" (per batch) ─────────────── */
@@ -2241,15 +2256,7 @@
       reloadHeadersForSetup();
     });
 
-    $("marketingClearHistoryBtn")?.addEventListener("click", async () => {
-      const msg =
-        "Cancellare tutto lo storico invii marketing?\n\nQuesta azione non può essere annullata. Le automazioni e le altre impostazioni non verranno modificate.";
-      if (!window.confirm(msg)) return;
-      await api()?.clearMarketingHistory?.();
-      await loadData();
-      renderAll();
-      showToast("Storico marketing cancellato.");
-    });
+    $("marketingHistoryRefreshBtn")?.addEventListener("click", () => renderHistory());
 
     document.querySelectorAll(".mkt-overlay").forEach((overlay) => {
       overlay.addEventListener("click", (e) => {
@@ -2284,17 +2291,9 @@
     });
   }
 
-  async function ensureRealSendActivated() {
-    if (!marketingConfig?.enabled) return;
-    if (marketingConfig.realSendEnabled) return;
-    await saveMarketing({ realSendEnabled: true });
-    showToast("Invio reale marketing attivato.", { info: true });
-  }
-
   async function init() {
     if (!document.querySelector('[data-view="marketing"]')) return;
     await loadData();
-    await ensureRealSendActivated();
     window.EasyfattAutomationWizard?.init?.({
       getMarketingConfig: () => marketingConfig,
       getAppConfig: () => appConfig,
@@ -2320,5 +2319,5 @@
     init();
   }
 
-  window.EasyfattMarketingUI = { loadData, renderAll, openWizard };
+  window.EasyfattMarketingUI = { loadData, renderAll, openWizard, showToast };
 })();

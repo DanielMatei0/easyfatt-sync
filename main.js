@@ -8,8 +8,18 @@ const {
   hasGoogleScope,
   GMAIL_SEND_SCOPE,
 } = require("./src/main/auth");
-const { startScheduler, stopScheduler, shouldStartScheduler } = require("./src/main/scheduler");
-const { runSync, runSyncAll, setPostMarketingHook } = require("./src/main/syncRunner");
+const {
+  startScheduler,
+  stopScheduler,
+  shouldStartScheduler,
+  setMarketingRunner: setSchedulerMarketingRunner,
+} = require("./src/main/scheduler");
+const {
+  runSync,
+  runSyncAll,
+  setPostMarketingHook,
+  setMarketingRunner: setSyncMarketingRunner,
+} = require("./src/main/syncRunner");
 const {
   mergeConfig,
   getDefaultConfig,
@@ -49,22 +59,12 @@ const { previewExcelFile } = require("./src/main/excelUtils");
 const { buildDiagnosticReport } = require("./src/main/diagnostics");
 const {
   getMarketingConfig,
-  setMarketingConfig,
   seedDefaultTemplates,
   clearSendHistory,
+  isAutomationRunnable,
 } = require("./src/main/marketingConfig");
-const {
-  loadMarketingRows,
-  getAutomationRecipients,
-  simulateAutomationRun,
-  simulateTestEmail,
-  getMarketingStats,
-  getAutomationRecipientsFromAutomation,
-  simulateAutomationDraft,
-  executeAutomationSend,
-  dryRunAutomationSend,
-} = require("./src/main/marketingEngine");
-const { sendMarketingBatch, verifyMarketingSender } = require("./src/main/marketingSender");
+const { loadMarketingRows, simulateTestEmail, renderTemplate } = require("./src/main/marketingEngine");
+const { createCloudService } = require("./src/main/cloud/cloudService");
 const pkgVersion = require("./package.json").version;
 const fs = require("fs");
 const os = require("os");
@@ -316,6 +316,21 @@ setPostMarketingHook(() => {
   sendMarketingUpdated();
 });
 
+/* ── Account Aven e registro invii (server Easyfatt Sync) ───────── */
+
+const cloud = createCloudService({
+  store,
+  app,
+  log: (m) => sendLog(String(m)),
+  broadcast: (channel, payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  },
+  getAppConfig: () => ensureConfigMigrated(store.get("config") || getDefaultConfig()),
+  getInstallId: () => getInstallId(),
+});
+setSyncMarketingRunner((options) => cloud.runMarketing(options));
+setSchedulerMarketingRunner((options) => cloud.runMarketing(options));
+
 /** Id installazione stabile (per external_ref dei ticket e context degli errori). Non è PII. */
 function getInstallId() {
   let id = store.get("installId");
@@ -352,6 +367,7 @@ app.whenReady().then(() => {
   store.set("config", prepared);
   applyOpenAtLoginSetting(prepared.openAtLogin, sendLog);
   scheduleStartupUpdateCheck();
+  cloud.startup().catch(() => {});
 });
 
 app.on("before-quit", () => {
@@ -858,9 +874,11 @@ ipcMain.handle("get-marketing-config", () => {
 });
 
 ipcMain.handle("save-marketing-config", (_, config) => {
-  let next = setMarketingConfig(store, config);
+  // Solo le modifiche dell'interfaccia, sopra la config attuale: storico e stato
+  // punti non si sovrascrivono più con una copia vecchia.
+  let next = cloud.saveMarketing(config || {});
   if (next.enabled && !next.templates.length) {
-    next = setMarketingConfig(store, seedDefaultTemplates(next));
+    next = cloud.saveMarketing({ templates: seedDefaultTemplates(next).templates });
   }
   sendMarketingUpdated();
   const appConfig = ensureConfigMigrated(store.get("config") || getDefaultConfig());
@@ -869,8 +887,28 @@ ipcMain.handle("save-marketing-config", (_, config) => {
 });
 
 ipcMain.handle("get-marketing-stats", async () => {
-  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
-  return getMarketingStats(store, config);
+  const marketing = getMarketingConfig(store);
+  const status = cloud.status();
+  let dueToday = null;
+  if (marketing.enabled && status.connected && status.migration.step === "done") {
+    const counts = await Promise.all(
+      marketing.automations
+        .filter((a) => isAutomationRunnable(a))
+        .map((a) => cloud.preview(a).then((p) => p.summary.valid).catch(() => 0)),
+    );
+    dueToday = counts.reduce((sum, n) => sum + n, 0);
+  }
+  return {
+    enabled: marketing.enabled,
+    activeAutomations: marketing.automations.filter((a) => isAutomationRunnable(a)).length,
+    totalAutomations: marketing.automations.length,
+    templatesCount: marketing.templates.length,
+    profilesCount: marketing.marketingProfiles.length,
+    dueToday,
+    lastSendAt: status.lastRun?.at || null,
+    lastSendStatus: status.lastRun ? (status.lastRun.ok ? "sent" : "failed") : null,
+    realSendEnabled: marketing.realSendEnabled,
+  };
 });
 
 ipcMain.handle("preview-marketing-excel", async (_, payload) => {
@@ -899,55 +937,63 @@ ipcMain.handle("preview-marketing-excel", async (_, payload) => {
   }
 });
 
+function findAutomation(automationId) {
+  const automation = getMarketingConfig(store).automations.find((a) => a.id === automationId);
+  if (!automation) throw new Error("Automazione non trovata.");
+  return automation;
+}
+
+/** Anteprima → risultato "simulazione": nessuna scrittura, né locale né sul server. */
+async function simulateFromPreview(automation, columnMappingOverride) {
+  const marketing = getMarketingConfig(store);
+  if (automation.archived) throw new Error("Automazione archiviata.");
+  const template = marketing.templates.find((t) => t.id === automation.templateId);
+  if (!template) throw new Error("Template email non trovato per questa automazione.");
+  const preview = await cloud.preview(automation, columnMappingOverride);
+  return {
+    ok: true,
+    simulated: true,
+    realSendEnabled: marketing.realSendEnabled,
+    message: `Simulazione: ${preview.recipients.length} destinatari riceverebbero l'email. Nessun invio effettuato.`,
+    summary: preview.summary,
+    recipients: preview.recipients.map((r) => ({
+      email: r.email,
+      name: r.name,
+      subject: renderTemplate(template, r.customer, marketing).subject,
+    })),
+    skippedCount: preview.skipped.length,
+  };
+}
+
 ipcMain.handle("get-automation-recipients", async (_, automationId) => {
-  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   try {
-    return await getAutomationRecipients(store, config, automationId);
+    return await cloud.preview(findAutomation(automationId));
   } catch (error) {
     throw new Error(toClientMessage(error));
   }
 });
 
 ipcMain.handle("preview-marketing-automation-draft", async (_, payload) => {
-  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   try {
-    const automation = payload?.automation;
-    if (!automation) throw new Error("Dati automazione mancanti.");
-    return await getAutomationRecipientsFromAutomation(
-      store,
-      config,
-      automation,
-      payload?.columnMappingOverride
-    );
+    if (!payload?.automation) throw new Error("Dati automazione mancanti.");
+    return await cloud.preview(payload.automation, payload?.columnMappingOverride);
   } catch (error) {
     throw new Error(toClientMessage(error));
   }
 });
 
 ipcMain.handle("simulate-marketing-automation-draft", async (_, payload) => {
-  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   try {
-    const automation = payload?.automation;
-    if (!automation) throw new Error("Dati automazione mancanti.");
-    const result = await simulateAutomationDraft(
-      store,
-      config,
-      automation,
-      payload?.columnMappingOverride
-    );
-    sendMarketingUpdated();
-    return result;
+    if (!payload?.automation) throw new Error("Dati automazione mancanti.");
+    return await simulateFromPreview(payload.automation, payload?.columnMappingOverride);
   } catch (error) {
     throw new Error(toClientMessage(error));
   }
 });
 
 ipcMain.handle("simulate-marketing-automation", async (_, automationId) => {
-  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   try {
-    const result = await simulateAutomationRun(store, config, automationId);
-    sendMarketingUpdated();
-    return result;
+    return await simulateFromPreview(findAutomation(automationId));
   } catch (error) {
     throw new Error(toClientMessage(error));
   }
@@ -956,62 +1002,120 @@ ipcMain.handle("simulate-marketing-automation", async (_, automationId) => {
 ipcMain.handle("simulate-marketing-test-email", async (_, payload) => {
   const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   try {
-    const result = await simulateTestEmail(store, config, payload || {});
-    sendMarketingUpdated();
-    return result;
+    return await simulateTestEmail(store, config, payload || {});
   } catch (error) {
     throw new Error(toClientMessage(error));
   }
 });
 
 ipcMain.handle("clear-marketing-history", () => {
+  // Solo lo storico locale delle versioni precedenti: il registro sul server resta.
   clearSendHistory(store);
   sendMarketingUpdated();
   return { ok: true };
 });
 
-ipcMain.handle("send-marketing-batch", async (_, payload) => {
-  const marketing = getMarketingConfig(store);
-  return sendMarketingBatch({
-    marketingApiUrl: marketing.marketingApiUrl,
-    payload,
-    dryRun: !!payload?.metadata?.dryRun,
-    realSendEnabled: marketing.realSendEnabled,
-  });
-});
-
 ipcMain.handle("verify-marketing-sender", async (_, payload) => {
   const marketing = getMarketingConfig(store);
-  return verifyMarketingSender({
-    marketingApiUrl: marketing.marketingApiUrl,
-    senderEmail: payload?.senderEmail || marketing.senderEmail,
-    action: payload?.action || "prepare",
-  });
+  try {
+    return await cloud.verifySender({
+      senderEmail: payload?.senderEmail || marketing.senderEmail,
+      action: payload?.action || "prepare",
+    });
+  } catch (error) {
+    return { ok: false, status: "network_error", message: error.message, records: [] };
+  }
 });
 
 ipcMain.handle("send-marketing-automation", async (_, payload) => {
-  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   try {
-    const result = await executeAutomationSend(store, config, payload?.automationId, {
-      dryRun: false,
-      consentConfirmed: !!payload?.consentConfirmed,
-      appVersion: pkgVersion,
-    });
+    const automation = findAutomation(payload?.automationId);
+    if (!isAutomationRunnable(automation)) throw new Error("Automazione disattivata.");
+    const result = await cloud.runMarketing({ trigger: "manual", automationIds: [automation.id] });
     sendMarketingUpdated();
-    return result;
+    if (result.busy) return { ok: false, message: result.message };
+    if (result.skipped) {
+      const reasons = {
+        not_connected: "Accedi con l'account Aven per inviare.",
+        migration_pending: "Completa il caricamento della configurazione sul server.",
+        real_send_disabled: "Invio reale disattivato nelle impostazioni marketing.",
+        marketing_disabled: "Marketing disattivato.",
+      };
+      return { ok: false, message: reasons[result.reason] || "Nessun invio eseguito." };
+    }
+    if (!result.ok) throw new Error(result.message);
+    const s = result.summary;
+    return {
+      ok: true,
+      dryRun: false,
+      simulated: false,
+      message: `Invio completato: ${s.sent} inviate, ${s.failed} non riuscite${s.held.length ? `, ${s.held.length} gruppi in attesa di approvazione` : ""}.${s.stoppedBy ? ` ${s.stoppedBy}` : ""}`,
+      summary: s,
+      recipientsCount: s.sent,
+    };
   } catch (error) {
     throw new Error(toClientMessage(error));
   }
 });
 
 ipcMain.handle("dry-run-marketing-automation", async (_, automationId) => {
-  const config = ensureConfigMigrated(store.get("config") || getDefaultConfig());
   try {
-    const result = await dryRunAutomationSend(store, config, automationId, pkgVersion);
-    sendMarketingUpdated();
-    return result;
+    return await simulateFromPreview(findAutomation(automationId));
   } catch (error) {
     throw new Error(toClientMessage(error));
+  }
+});
+
+ipcMain.handle("run-marketing-now", async () => {
+  const result = await cloud.runMarketing({ trigger: "manual" });
+  sendMarketingUpdated();
+  return result;
+});
+
+ipcMain.handle("cloud-status", () => cloud.status());
+
+ipcMain.handle("cloud-login", async () => {
+  try {
+    return { ok: true, status: await cloud.login() };
+  } catch (error) {
+    return { ok: false, message: error.message, status: cloud.status() };
+  }
+});
+
+ipcMain.handle("cloud-cancel-login", () => {
+  cloud.cancelLogin();
+  return { ok: true };
+});
+
+ipcMain.handle("cloud-logout", async () => cloud.logout());
+
+ipcMain.handle("cloud-migrate", async () => cloud.migrate());
+
+ipcMain.handle("cloud-password-code", async () => {
+  try {
+    return await cloud.requestPasswordCode();
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+});
+
+ipcMain.handle("cloud-set-password", async (_, payload) => {
+  try {
+    return await cloud.setPassword(String(payload?.code || ""), String(payload?.password || ""));
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+});
+
+ipcMain.handle("list-marketing-sends", async (_, params) => {
+  try {
+    const clean = {};
+    ["limit", "cursor", "status", "automation_id"].forEach((k) => {
+      if (params && params[k] != null && params[k] !== "") clean[k] = String(params[k]);
+    });
+    return { ok: true, ...(await cloud.listSends(clean)) };
+  } catch (error) {
+    return { ok: false, message: error.message, items: [] };
   }
 });
 

@@ -1,0 +1,217 @@
+/**
+ * Punto unico con cui main.js parla al server Easyfatt Sync: accesso, migrazione,
+ * giri di invio, anteprime, configurazione condivisa, storico invii.
+ */
+const { getMarketingConfig, patchMarketingConfig } = require("../marketingConfig");
+const engine = require("../marketingEngine");
+const { createClient, CloudError } = require("./cloudApi");
+const tokenStore = require("./tokenStore");
+const authClient = require("./authClient");
+const migration = require("./migration");
+const configSync = require("./configSync");
+const pending = require("./pendingStore");
+const { createRunner, events: runnerEvents } = require("./marketingRunner");
+const { previewAutomation } = require("./preview");
+
+function createCloudService({ store, app, log = () => {}, broadcast = () => {}, getAppConfig, getInstallId }) {
+  let lastError = null;
+  let lastRun = store.get("cloud.lastRun") || null;
+  let migrating = null;
+  let shopFlags = null;
+
+  const client = createClient(store, {
+    onUnauthorized: () => {
+      // Token revocato o utente disattivato: il PC torna al login, la config locale resta.
+      if (tokenStore.sessionInfo(store)) {
+        tokenStore.clearSession(store);
+        log("[Account] Accesso non più valido: accedi di nuovo con l'account Aven.");
+        emitStatus();
+      }
+    },
+  });
+
+  function isConnected() {
+    return Boolean(tokenStore.sessionInfo(store));
+  }
+
+  function status() {
+    const session = tokenStore.sessionInfo(store);
+    return {
+      connected: Boolean(session),
+      shop: session?.shop || null,
+      user: session?.user || null,
+      device: session?.device || null,
+      migration: migration.getState(store),
+      migrating: Boolean(migrating),
+      config: configSync.state(store),
+      pendingConfirms: pending.count(store),
+      marketingPaused: shopFlags ? shopFlags.marketing_paused : null,
+      lastRun,
+      lastError,
+    };
+  }
+
+  function emitStatus() {
+    broadcast("cloud-status", status());
+  }
+
+  const runner = createRunner({
+    store,
+    client,
+    getAppConfig,
+    engine,
+    log,
+    shopId: () => tokenStore.sessionInfo(store)?.shop?.id,
+    gate: () => {
+      if (!isConnected()) return { ok: false, reason: "not_connected" };
+      if (!migration.isDone(store)) return { ok: false, reason: "migration_pending" };
+      return { ok: true };
+    },
+  });
+
+  runnerEvents.on("run-finished", () => {
+    broadcast("marketing-updated", getMarketingConfig(store));
+  });
+
+  async function refreshMe() {
+    if (!isConnected()) return null;
+    const me = await client.me();
+    shopFlags = me.shop;
+    tokenStore.updateSessionInfo(store, { shop: { id: me.shop.id, name: me.shop.name }, user: me.user });
+    return me;
+  }
+
+  async function migrate() {
+    if (migrating) return migrating;
+    migrating = (async () => {
+      try {
+        lastError = null;
+        emitStatus();
+        const result = await migration.runMigration({
+          store,
+          client,
+          userDataDir: app.getPath("userData"),
+          getAppConfig,
+          engine,
+          log,
+          onProgress: () => emitStatus(),
+        });
+        broadcast("marketing-updated", getMarketingConfig(store));
+        return result;
+      } catch (err) {
+        lastError = err.message;
+        log(`[Account] Migrazione non completata: ${err.message}`);
+        return { ok: false, message: err.message };
+      } finally {
+        migrating = null;
+        emitStatus();
+      }
+    })();
+    return migrating;
+  }
+
+  async function login() {
+    lastError = null;
+    const result = await authClient.startLogin(store, getInstallId());
+    log(`[Account] Accesso eseguito: ${result.user.email} (${result.shop.name}).`);
+    emitStatus();
+    await refreshMe().catch(() => {});
+    if (!migration.isDone(store)) await migrate();
+    return status();
+  }
+
+  async function logout() {
+    try {
+      await client.logout();
+    } catch {
+      /* il token viene comunque rimosso da questo PC */
+    }
+    tokenStore.clearSession(store);
+    shopFlags = null;
+    emitStatus();
+    return status();
+  }
+
+  async function startup() {
+    if (!isConnected()) return;
+    try {
+      await refreshMe();
+      if (migration.isDone(store)) {
+        const r = await configSync.sync(store, client);
+        if (r.pulled) broadcast("marketing-updated", getMarketingConfig(store));
+      }
+    } catch (err) {
+      lastError = err instanceof CloudError && err.kind === "offline" ? "Server non raggiungibile: invii in pausa." : err.message;
+    }
+    emitStatus();
+  }
+
+  async function runMarketing(options) {
+    const result = await runner.runMarketing(options);
+    if (result && !result.skipped) {
+      lastRun = { at: new Date().toISOString(), ok: result.ok, summary: result.summary || null, message: result.message || null };
+      store.set("cloud.lastRun", lastRun);
+      lastError = result.ok ? null : result.message;
+      emitStatus();
+    }
+    return result;
+  }
+
+  async function preview(automation, columnMappingOverride) {
+    const session = tokenStore.sessionInfo(store);
+    if (!session || !migration.isDone(store)) {
+      throw new Error("Accedi con l'account Aven per vedere i destinatari.");
+    }
+    return previewAutomation({
+      store,
+      client,
+      shopId: session.shop.id,
+      appConfig: getAppConfig(),
+      automation,
+      marketing: getMarketingConfig(store),
+      engine,
+      columnMappingOverride,
+    });
+  }
+
+  /** Salva le modifiche dell'interfaccia e le porta sul server (se offline, al prossimo avvio). */
+  function saveMarketing(patch) {
+    const next = patchMarketingConfig(store, patch);
+    if (isConnected() && migration.isDone(store)) {
+      configSync
+        .push(store, client, { reapply: () => patchMarketingConfig(store, patch) })
+        .then((r) => {
+          if (r.merged || r.pulled) broadcast("marketing-updated", getMarketingConfig(store));
+          if (!r.ok && r.reason !== "not_migrated") log(`[Account] Configurazione salvata solo su questo PC: ${r.message || r.reason}`);
+          emitStatus();
+        })
+        .catch(() => {});
+    }
+    return next;
+  }
+
+  return {
+    client,
+    status,
+    login,
+    cancelLogin: authClient.cancelLogin,
+    logout,
+    migrate,
+    startup,
+    runMarketing,
+    preview,
+    saveMarketing,
+    listSends: (params) => client.listSends(params),
+    verifySender: (body) => client.sender(body),
+    requestPasswordCode: () => client.requestPasswordCode(),
+    setPassword: async (code, password) => {
+      await client.setPassword(code, password);
+      tokenStore.updateSessionInfo(store, { user: { ...(tokenStore.sessionInfo(store)?.user || {}), has_password: true } });
+      emitStatus();
+      return { ok: true };
+    },
+    isConnected,
+  };
+}
+
+module.exports = { createCloudService };
