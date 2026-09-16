@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Easyfatt Sync</title>
-  <link rel="icon" type="image/png" href="../assets/icon.png" />
+  <link rel="icon" type="image/png" href="assets/app-icon.png" />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body data-theme="dark">
@@ -442,7 +442,7 @@
     <header class="app-header">
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">
-          <img class="brand-icon-img" src="../assets/icon.png" alt="" width="28" height="28" />
+          <img class="brand-icon-img" src="assets/app-icon.png" alt="" width="28" height="28" />
         </div>
         <div class="brand-text">
           <h1>Easyfatt Sync</h1>
@@ -683,6 +683,35 @@
               </div>
             </div>
           </header>
+
+          <section id="cloudAccountCard" class="card mkt-card cloud-account" aria-live="polite">
+            <div class="cloud-account-head">
+              <div>
+                <p class="mkt-section-kicker">Account Aven</p>
+                <h2 id="cloudAccountTitle" class="sync-hero-title">Accedi per inviare le email</h2>
+                <p id="cloudAccountDesc" class="sync-hero-desc">Gli invii vengono registrati sul server Aven: ogni email parte una volta sola, anche con più PC.</p>
+              </div>
+              <span id="cloudAccountBadge" class="mkt-status-badge" data-state="unconfigured">Non collegato</span>
+            </div>
+            <div id="cloudAccountSteps" class="cloud-steps" hidden></div>
+            <p id="cloudAccountError" class="cloud-error" role="alert" hidden></p>
+            <div class="mkt-secondary-actions cloud-actions">
+              <button type="button" id="cloudLoginBtn" class="btn btn-primary">Accedi con account Aven</button>
+              <button type="button" id="cloudCancelLoginBtn" class="btn btn-ghost btn-sm" hidden>Annulla accesso</button>
+              <button type="button" id="cloudMigrateBtn" class="btn btn-primary" hidden>Riprova caricamento</button>
+              <button type="button" id="cloudRunNowBtn" class="btn btn-secondary btn-sm" hidden>Invia ora</button>
+              <button type="button" id="cloudPasswordBtn" class="btn btn-ghost btn-sm" hidden>Imposta password</button>
+              <button type="button" id="cloudLogoutBtn" class="btn btn-ghost btn-sm" hidden>Scollega questo PC</button>
+            </div>
+            <form id="cloudPasswordForm" class="cloud-password" hidden>
+              <p class="muted-text">Ti abbiamo inviato un codice via email. Inseriscilo e scegli una password (almeno 10 caratteri).</p>
+              <div class="cloud-password-row">
+                <input id="cloudPasswordCode" class="mkt-input" inputmode="numeric" maxlength="6" placeholder="Codice a 6 cifre" autocomplete="one-time-code" />
+                <input id="cloudPasswordNew" class="mkt-input" type="password" minlength="10" placeholder="Nuova password" autocomplete="new-password" />
+                <button type="submit" class="btn btn-primary btn-sm">Salva password</button>
+              </div>
+            </form>
+          </section>
 
           <section id="marketingEmptyState" class="mkt-empty card" aria-labelledby="mkt-empty-title">
             <div class="mkt-empty-icon" aria-hidden="true">
@@ -970,22 +999,22 @@
                   <div>
                     <p class="mkt-section-kicker">Registro attività</p>
                     <h2 class="sync-hero-title">Storico invii</h2>
-                    <p class="sync-hero-desc">Registro locale di simulazioni e invii saltati.</p>
+                    <p class="sync-hero-desc">Invii registrati sul server Aven per questo negozio (tutti i PC).</p>
                   </div>
                   <div class="mkt-secondary-actions">
                     <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="setup">Torna alle impostazioni</button>
-                    <button type="button" id="marketingClearHistoryBtn" class="btn btn-ghost btn-sm">Pulisci storico</button>
+                    <button type="button" id="marketingHistoryRefreshBtn" class="btn btn-ghost btn-sm">Aggiorna</button>
                   </div>
                 </div>
                 <div id="marketingHistoryEmpty" class="mkt-inline-empty" hidden>
-                  <p>Nessun invio simulato ancora. Usa <strong>Simula invio</strong> su un’automazione.</p>
+                  <p id="marketingHistoryEmptyText">Nessun invio registrato per ora.</p>
                 </div>
                 <div class="mkt-table-wrap">
                   <table id="marketingHistoryTable" class="mkt-table" hidden>
                     <thead>
                       <tr>
                         <th>Automazione</th>
-                        <th>Destinatari</th>
+                        <th>Destinatario</th>
                         <th>Esito</th>
                         <th>Data</th>
                       </tr>
@@ -1924,6 +1953,7 @@
   <script src="./marketing-automation-wizard.js"></script>
   <script src="./marketing-template-editor.js"></script>
   <script src="./marketing-ui.js"></script>
+  <script src="./cloud-account.js"></script>
   <script src="./diff-detail-ui.js"></script>
   <script src="./renderer.js"></script>
 </body>

@@ -217,7 +217,79 @@ async function sendGmailMarketingBatch(options = {}) {
   };
 }
 
+/**
+ * Classifica un errore Gmail per il registro invii:
+ * - "auth": token scaduto/revocato → fermarsi, ricollegare Google;
+ * - "failed": Gmail ha risposto con un errore → la mail NON è partita, si può ritentare;
+ * - "dead": errore definitivo per quel destinatario;
+ * - "uncertain": nessuna risposta (rete, timeout) → potrebbe essere partita.
+ */
+function classifyGmailError(error) {
+  const status = Number(error?.code || error?.response?.status || 0);
+  const message = String(error?.message || "");
+  if (status === 401 || /invalid_grant|unauthorized|token/i.test(message)) return "auth";
+  if (status === 403 && /insufficient|scope|permission/i.test(message)) return "auth";
+  if (status === 400 && /invalid to header|recipient address|invalid.*address/i.test(message)) return "dead";
+  if (status >= 400) return "failed";
+  return "uncertain";
+}
+
+/**
+ * Mittente Gmail per un messaggio alla volta (registro invii 26.3).
+ * `preflight` verifica token e permesso PRIMA di prendere in carico eventi.
+ */
+function createGmailSender(businessProfile) {
+  const senderEmail = String(businessProfile?.senderEmail || "").trim().toLowerCase();
+  const marketingConfig = buildMarketingConfig(businessProfile || {});
+  const bp = getBusinessProfile(marketingConfig);
+  const from = encodeAddress(senderEmail, bp.senderName || bp.businessName || senderEmail);
+  const replyTo = businessProfile?.replyToEmail || senderEmail;
+  let gmail = null;
+
+  return {
+    async preflight() {
+      if (!isGmailAddress(senderEmail)) throw Object.assign(new Error("Il mittente non è un indirizzo Gmail."), { kind: "config" });
+      if (!hasGoogleScope(GMAIL_SEND_SCOPE)) {
+        throw Object.assign(new Error("Permesso Gmail mancante. Ricollega Google e accetta il permesso di invio email."), { kind: "auth" });
+      }
+      try {
+        const auth = await authorizeGoogle();
+        gmail = getGoogleApi().gmail({ version: "v1", auth });
+      } catch (error) {
+        throw Object.assign(new Error(mapGmailError(error)), { kind: "auth" });
+      }
+    },
+
+    /** @returns {Promise<{outcome:"SENT"|"FAILED"|"DEAD"|"UNCERTAIN", kind?:string, error?:string, messageId?:string}>} */
+    async sendOne(template, recipient) {
+      if (!gmail) await this.preflight();
+      const email = String(recipient.email || "").trim().toLowerCase();
+      let raw;
+      try {
+        const rendered = renderMarketingEmail(template, marketingConfig, customerFromRecipient(recipient), {
+          reward: recipient.variables?.premio || recipient.variables?.reward,
+          threshold: recipient.variables?.soglia,
+          businessName: bp.businessName,
+        });
+        raw = buildMimeMessage({ from, to: email, replyTo, subject: rendered.subject, html: rendered.bodyHtml, text: rendered.bodyText });
+      } catch (error) {
+        return { outcome: "DEAD", error: `Template non valido: ${error.message}` };
+      }
+      try {
+        const res = await gmail.users.messages.send({ userId: "me", requestBody: { raw: base64Url(raw) } });
+        return { outcome: "SENT", messageId: res?.data?.id || null };
+      } catch (error) {
+        const kind = classifyGmailError(error);
+        const outcome = kind === "dead" ? "DEAD" : kind === "uncertain" ? "UNCERTAIN" : "FAILED";
+        return { outcome, kind, error: mapGmailError(error).slice(0, 400) };
+      }
+    },
+  };
+}
+
 module.exports = {
   sendGmailMarketingBatch,
+  createGmailSender,
+  classifyGmailError,
   isGmailAddress,
 };

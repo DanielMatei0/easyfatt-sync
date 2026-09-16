@@ -1,3 +1,26 @@
+# Easyfatt Sync 26.3.0
+
+**Account Aven e registro invii sul server: ogni email parte una volta sola.**
+
+## Cosa cambia per il negozio
+
+- **Accedi con account Aven** (sezione Marketing): codice via email, password o Google. Al primo accesso l'app porta sul server campagne, template e clienti già presenti. **Sul PC non viene cancellato nulla** (copia di sicurezza in `migration-backups`).
+- Gli invii sono registrati sul server Aven: niente doppioni, anche con più PC. Se il server non è raggiungibile le email aspettano; la sincronizzazione con Google Sheets continua.
+- **Storico invii** letto dal server, per tutti i PC del negozio.
+- Nuova icona, visibile anche nella barra del titolo di Windows e in alto a sinistra nell'app.
+
+## Problemi risolti
+
+- **Email punti mai inviate**: il superamento di soglia (es. 0 → 60 punti) ora viene rilevato; con più soglie partono quelle superate, una volta, e ripartono se i punti scendono e risalgono.
+- **Compleanni mai inviati**: si confrontano giorno e mese, non l'anno di nascita (29/02 festeggiato il 28/02 negli anni non bisestili). L'invio programmato non salta più se c'è una sincronizzazione in corso.
+- **Benvenuto inviato a clienti già esistenti**: il benvenuto va solo ai clienti comparsi dopo l'attivazione della campagna; troppi clienti "nuovi" tutti insieme vengono trattenuti per verifica.
+- **Reinvii dopo modifiche alle impostazioni**: salvare dalla schermata Marketing non sovrascrive più lo storico degli invii.
+- Simulazioni e anteprime non vengono più contate come invii.
+- L'app non riattiva più da sola l'invio reale.
+- Oltre 50 destinatari: partono tutti, nei giri successivi se serve (rispettando i limiti di Gmail).
+
+---
+
 # Easyfatt Sync 26.0.0
 
 **Prima release ufficiale del ciclo prodotto 2026.**

@@ -54,11 +54,20 @@ contextBridge.exposeInMainWorld("easyfattSync", {
   simulateMarketingTestEmail: (payload) =>
     ipcRenderer.invoke("simulate-marketing-test-email", payload),
   clearMarketingHistory: () => ipcRenderer.invoke("clear-marketing-history"),
-  sendMarketingBatch: (payload) => ipcRenderer.invoke("send-marketing-batch", payload),
   verifyMarketingSender: (payload) => ipcRenderer.invoke("verify-marketing-sender", payload),
   sendMarketingAutomation: (payload) => ipcRenderer.invoke("send-marketing-automation", payload),
   dryRunMarketingAutomation: (automationId) =>
     ipcRenderer.invoke("dry-run-marketing-automation", automationId),
+  runMarketingNow: () => ipcRenderer.invoke("run-marketing-now"),
+  listMarketingSends: (params) => ipcRenderer.invoke("list-marketing-sends", params),
+  getCloudStatus: () => ipcRenderer.invoke("cloud-status"),
+  cloudLogin: () => ipcRenderer.invoke("cloud-login"),
+  cloudCancelLogin: () => ipcRenderer.invoke("cloud-cancel-login"),
+  cloudLogout: () => ipcRenderer.invoke("cloud-logout"),
+  cloudMigrate: () => ipcRenderer.invoke("cloud-migrate"),
+  cloudPasswordCode: () => ipcRenderer.invoke("cloud-password-code"),
+  cloudSetPassword: (payload) => ipcRenderer.invoke("cloud-set-password", payload),
+  onCloudStatus: (callback) => onUpdateEvent("cloud-status", callback),
   pickMarketingLogo: () => ipcRenderer.invoke("pick-marketing-logo"),
   getMarketingLogoDataUrl: (logoPath) => ipcRenderer.invoke("get-marketing-logo-data-url", logoPath),
   renderMarketingEmailPreview: (payload) =>

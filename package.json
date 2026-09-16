@@ -1,10 +1,11 @@
 {
   "name": "easyfatt-sync-app",
-  "version": "26.2.1",
+  "version": "26.3.0",
   "description": "Easyfatt Sync — Aven Labs (Excel → Google Sheets)",
   "main": "main.js",
   "scripts": {
     "dev": "electron .",
+    "test": "node --test 'tests/*.test.js'",
     "dist:win": "electron-builder --win nsis --x64",
     "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --arm64",
     "dist:mac:intel": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --x64",
@@ -24,6 +25,7 @@
     "files": [
       "**/*",
       "!dist/**",
+      "!tests/**",
       "!docs/**",
       "!docs-pdf/**",
       "!backend-examples/**",

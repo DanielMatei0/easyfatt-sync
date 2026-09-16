@@ -6530,3 +6530,86 @@ body[data-theme="dark"] .mkt-combobox-panel {
   border: 1px dashed var(--border-subtle);
   text-align: center;
 }
+
+/* ── Account Aven (registro invii sul server) ───────────────────── */
+.cloud-account-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.cloud-actions {
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.cloud-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.cloud-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--card-hover);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cloud-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.cloud-step[data-state="active"] {
+  color: var(--text);
+}
+
+.cloud-step[data-state="active"] .cloud-step-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-muted);
+}
+
+.cloud-step[data-state="done"] .cloud-step-dot {
+  background: var(--status-success-text);
+}
+
+.cloud-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  font-size: 13px;
+}
+
+.cloud-error[hidden],
+.cloud-steps[hidden],
+.cloud-password[hidden] {
+  display: none;
+}
+
+.cloud-password {
+  margin-top: 14px;
+}
+
+.cloud-password-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.cloud-password-row .mkt-input {
+  flex: 1 1 160px;
+}
