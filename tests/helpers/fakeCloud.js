@@ -14,6 +14,8 @@ function createFakeCloud({ paused = false } = {}) {
   let migration = null;
   let tick = 0;
   const calls = [];
+  const decisions = new Map();
+  const decisionCalls = [];
 
   const guard = (name) => {
     calls.push(name);
@@ -87,6 +89,7 @@ function createFakeCloud({ paused = false } = {}) {
         if (automationIds && !automationIds.includes(e.automation_id)) continue;
         if (e.status === "QUEUED" || e.status === "FAILED") {
           e.status = "CLAIMED";
+          e.blocked_reason = null;
           e.claim_token = crypto.randomBytes(16).toString("base64url");
           e.attempts++;
           out.push({ ...e });
@@ -156,6 +159,23 @@ function createFakeCloud({ paused = false } = {}) {
       shop.version = 1;
       return { version: 1, counts: { customers: customers.size } };
     },
+    async decisions(runId, list) {
+      guard("decisions");
+      decisionCalls.push(list.length);
+      list.forEach((d) => decisions.set(`${d.automation_id}:${d.customer_key}`, { ...d, event_key: d.event_key || decisions.get(`${d.automation_id}:${d.customer_key}`)?.event_key || null }));
+      return { saved: list.length };
+    },
+    async blocked({ reason, automation_ids }) {
+      guard("blocked");
+      let n = 0;
+      for (const e of sends.values()) {
+        if ((e.status === "QUEUED" || e.status === "FAILED") && (!automation_ids || automation_ids.includes(e.automation_id))) {
+          e.blocked_reason = reason;
+          n++;
+        }
+      }
+      return { updated: n };
+    },
     async deliver() {
       throw new Error("non usato nei test Gmail");
     },
@@ -163,6 +183,8 @@ function createFakeCloud({ paused = false } = {}) {
 
   return {
     client,
+    decisions,
+    decisionCalls,
     shop,
     customers,
     sends,

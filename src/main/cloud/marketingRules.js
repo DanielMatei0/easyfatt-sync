@@ -85,6 +85,35 @@ function isValidEmail(email) {
 
 const AUDIENCE_MODES = ["card", "consent", "all"];
 
+/**
+ * Perché un cliente non riceve una campagna, in due famiglie:
+ * - EXCLUDED: manca qualcosa (dato, iscrizione, impostazione) → da guardare;
+ * - NOT_DUE: tutto regolare, semplicemente non è il momento (compleanno non oggi…).
+ */
+const DECISION_CATEGORY = {
+  email_missing: "EXCLUDED",
+  email_invalid: "EXCLUDED",
+  not_in_list: "EXCLUDED",
+  no_consent: "EXCLUDED",
+  automation_inactive: "EXCLUDED",
+  trigger_disabled: "EXCLUDED",
+  birthdate_missing: "EXCLUDED",
+  no_thresholds: "EXCLUDED",
+  points_missing: "EXCLUDED",
+  no_card: "EXCLUDED",
+  card_of_known_customer: "EXCLUDED",
+  last_purchase_missing: "EXCLUDED",
+  not_birthday: "NOT_DUE",
+  points_baseline: "NOT_DUE",
+  no_threshold_crossed: "NOT_DUE",
+  no_points_yet: "NOT_DUE",
+  already_known: "NOT_DUE",
+  had_points: "NOT_DUE",
+  card_already: "NOT_DUE",
+  recently_active: "NOT_DUE",
+  cooldown: "NOT_DUE",
+};
+
 function hasCard(customer) {
   return String(customer?.fidelityCardNumber || "").trim() !== "";
 }
@@ -107,10 +136,10 @@ function audienceMode(marketing, automation) {
 function audienceCheck(customer, marketing, automation) {
   const mode = audienceMode(marketing, automation);
   if (mode === "all") return { ok: true };
-  if (mode === "card") return hasCard(customer) ? { ok: true } : { ok: false, reason: "Non iscritto alla lista: tessera fedeltà assente" };
+  if (mode === "card") return hasCard(customer) ? { ok: true } : { ok: false, code: "not_in_list", reason: "Non iscritto alla lista: tessera fedeltà assente" };
   const val = String(customer.marketingConsent || "").trim().toLowerCase();
   const allowed = (marketing?.validConsentValues || []).map((v) => String(v).trim().toLowerCase());
-  return val && allowed.includes(val) ? { ok: true } : { ok: false, reason: "Consenso marketing assente o non valido" };
+  return val && allowed.includes(val) ? { ok: true } : { ok: false, code: "no_consent", reason: "Consenso marketing assente o non valido" };
 }
 
 function getThresholds(automation) {
@@ -196,13 +225,13 @@ function isRealNewCustomer(state, cardMatch, automation) {
  */
 function evaluateCustomer(p) {
   const { customer, automation, marketing, shopId, state, cardMatch, nextState, lastSentAt, now } = p;
-  const no = (reason) => ({ match: false, reason, events: [] });
+  const no = (code, reason) => ({ match: false, code, category: DECISION_CATEGORY[code] || "EXCLUDED", reason, events: [] });
   const email = normalizeEmail(customer.email);
-  if (!email) return no("Email mancante");
-  if (!isValidEmail(email)) return no("Email non valida");
+  if (!email) return no("email_missing", "Email mancante");
+  if (!isValidEmail(email)) return no("email_invalid", "Email non valida");
   const audience = audienceCheck(customer, marketing, automation);
-  if (!audience.ok) return no(audience.reason);
-  if (!toDate(automation.activatedAt)) return no("Automazione da riattivare");
+  if (!audience.ok) return no(audience.code, audience.reason);
+  if (!toDate(automation.activatedAt)) return no("automation_inactive", "Automazione da riattivare");
 
   const auto = safeAutomationId(automation.id);
   const cust = customerKey(shopId, email);
@@ -213,9 +242,9 @@ function evaluateCustomer(p) {
 
   switch (automation.type) {
     case "birthday": {
-      if (c.birthdayEnabled === false) return no("Trigger compleanno disattivato");
-      if (!customer.birthDate) return no("Data di nascita mancante");
-      if (!isBirthdayToday(customer.birthDate, now)) return no("Compleanno non è oggi");
+      if (c.birthdayEnabled === false) return no("trigger_disabled", "Trigger compleanno disattivato");
+      if (!customer.birthDate) return no("birthdate_missing", "Data di nascita mancante");
+      if (!isBirthdayToday(customer.birthDate, now)) return no("not_birthday", "Compleanno non è oggi");
       return {
         match: true,
         events: [{
@@ -227,15 +256,15 @@ function evaluateCustomer(p) {
     }
 
     case "points_threshold": {
-      if (c.pointsTriggerEnabled === false) return no("Trigger punti disattivato");
+      if (c.pointsTriggerEnabled === false) return no("trigger_disabled", "Trigger punti disattivato");
       const thresholds = getThresholds(automation);
-      if (!thresholds.length) return no("Nessuna soglia punti impostata");
+      if (!thresholds.length) return no("no_thresholds", "Nessuna soglia punti impostata");
       const curr = numberOrNull(customer.points);
-      if (curr === null) return no("Punti non disponibili");
+      if (curr === null) return no("points_missing", "Punti non disponibili");
       const prev = previousPoints(state, automation);
-      if (prev === null) return no("Punti registrati: invio al prossimo superamento soglia");
+      if (prev === null) return no("points_baseline", "Punti registrati: invio al prossimo superamento soglia");
       const crossed = thresholds.filter((t) => prev < t && curr >= t);
-      if (!crossed.length) return no(`Nessuna soglia superata (${prev} → ${curr})`);
+      if (!crossed.length) return no("no_threshold_crossed", `Nessuna soglia superata (${prev} → ${curr})`);
       const chosen = c.multiCrossMode === "each" ? crossed : [Math.max(...crossed)];
       const rewards = c.pointsThresholdRewards || {};
       return {
@@ -257,17 +286,17 @@ function evaluateCustomer(p) {
       const mode = c.fidelityMode || "new_fidelity";
       if (mode === "first_points") {
         const curr = numberOrNull(customer.points);
-        if (curr === null || curr <= 0) return no("Nessun punto fidelity");
+        if (curr === null || curr <= 0) return no("no_points_yet", "Nessun punto fidelity");
         const prev = previousPoints(state, automation);
-        if (prev === null) return no("Cliente già presente prima dell'attivazione");
-        if (prev > 0) return no("Aveva già punti");
+        if (prev === null) return no("already_known", "Cliente già presente prima dell'attivazione");
+        if (prev > 0) return no("had_points", "Aveva già punti");
         return {
           match: true,
           events: [{ event_key: `fpts:${auto}:${cust}`, expires_at: inDays(14), meta: { fidelityMode: mode } }],
         };
       }
       if (mode === "new_fidelity" && !hasCard(customer) && !customer.fidelityActivatedAt) {
-        return no("Nessuna tessera fedeltà");
+        return no("no_card", "Nessuna tessera fedeltà");
       }
       const activatedAt = toDate(automation.activatedAt);
       const cardActivated = toDate(customer.fidelityActivatedAt);
@@ -282,8 +311,8 @@ function evaluateCustomer(p) {
       const cardAssigned =
         mode === "new_fidelity" && hasCard(customer) && state && !state.card_key && observedAt && observedAt >= activatedAt;
       if (!isRealNewCustomer(state, cardMatch, automation) && !recentActivation && !cardAssigned) {
-        if (cardMatch) return no("Stessa tessera di un cliente già noto");
-        return no(state && state.card_key ? "Tessera già presente prima dell'attivazione" : "Cliente già presente prima dell'attivazione");
+        if (cardMatch) return no("card_of_known_customer", "Stessa tessera di un cliente già noto");
+        return state && state.card_key ? no("card_already", "Tessera già presente prima dell'attivazione") : no("already_known", "Cliente già presente prima dell'attivazione");
       }
       return {
         match: true,
@@ -294,11 +323,11 @@ function evaluateCustomer(p) {
     case "inactive_customer": {
       const inactiveDays = Number(c.inactiveDays) || 90;
       const last = toDate(customer.lastPurchaseDate);
-      if (!last) return no("Data ultimo acquisto mancante");
+      if (!last) return no("last_purchase_missing", "Data ultimo acquisto mancante");
       if (Math.floor((now.getTime() - last.getTime()) / DAY_MS) < inactiveDays) {
-        return no(`Attivo negli ultimi ${inactiveDays} giorni`);
+        return no("recently_active", `Attivo negli ultimi ${inactiveDays} giorni`);
       }
-      if (inCooldown()) return no(`In cooldown (${cooldownDays} giorni)`);
+      if (inCooldown()) return no("cooldown", `In cooldown (${cooldownDays} giorni)`);
       return {
         match: true,
         events: [{ event_key: `inact:${auto}:${cust}:${localDateKey(last)}`, expires_at: inDays(7), meta: { inactiveDays } }],
@@ -307,7 +336,7 @@ function evaluateCustomer(p) {
 
     case "custom":
     default: {
-      if (inCooldown()) return no(`In cooldown (${cooldownDays} giorni)`);
+      if (inCooldown()) return no("cooldown", `In cooldown (${cooldownDays} giorni)`);
       return {
         match: true,
         events: [{ event_key: `cust:${auto}:${cust}:${localDateKey(now)}`, expires_at: startOfNextLocalDay(now).toISOString(), meta: {} }],
@@ -340,14 +369,20 @@ function applyGuards({ candidates, knownCount, newCustomerCount, totalCustomers 
   return {
     events: candidates.map((e) => {
       const isWelcome = e.event_key.startsWith("welc:") || e.event_key.startsWith("fpts:");
-      const held = (suspiciousNew && isWelcome) || heldAutomations.has(e.automation_id);
-      return { ...e, status: held ? "HELD" : "QUEUED" };
+      const heldNew = suspiciousNew && isWelcome;
+      const heldMass = heldAutomations.has(e.automation_id);
+      if (!heldNew && !heldMass) return { ...e, status: "QUEUED" };
+      const why = heldNew
+        ? `Trattenuta per verifica: ${newCustomerCount} clienti mai visti comparsi insieme (limite ${Math.max(20, Math.ceil(knownCount * 0.1))})`
+        : `Trattenuta per verifica: ${perAutomation.get(e.automation_id)} destinatari insieme per questa campagna (limite 100 o 20% dei clienti)`;
+      return { ...e, status: "HELD", hold_reason: why };
     }),
     reasons,
   };
 }
 
 module.exports = {
+  DECISION_CATEGORY,
   AUDIENCE_MODES,
   audienceMode,
   audienceCheck,
