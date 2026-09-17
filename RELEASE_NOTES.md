@@ -1,3 +1,12 @@
+# Easyfatt Sync 26.3.1
+
+## Problemi risolti
+
+- **Email con dati d'esempio**: se a un cliente mancava il nome, il codice tessera o i punti, l'email usava i valori d'esempio ("Ciao Mario", "fidelity card FID-12345", "120 punti"). Ora il dato mancante resta vuoto e l'email si legge comunque bene ("Ciao,"). Il testo delle email resta quello dei template.
+- **Compleanni**: riconosciute anche le date di nati prima del 1954 e le date scritte come testo "gg/mm" senza anno.
+
+---
+
 # Easyfatt Sync 26.3.0
 
 **Account Aven e registro invii sul server: ogni email parte una volta sola.**

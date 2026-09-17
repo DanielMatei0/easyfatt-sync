@@ -42,9 +42,18 @@ function stripHtmlToText(html) {
     .trim();
 }
 
+/**
+ * Valori delle variabili {{...}}.
+ *
+ * I valori d'esempio (Mario, FID-12345, 15 maggio…) servono SOLO alle anteprime
+ * senza cliente. In un'email vera un dato mancante resta vuoto: prima un cliente
+ * senza nome riceveva "Ciao Mario" e uno senza tessera "fidelity card FID-12345".
+ */
 function buildVariableMap(customer, businessProfile, extra = {}) {
   const bp = businessProfile || {};
-  const c = customer || {};
+  const isSample = !customer || customer === SAMPLE_CUSTOMER;
+  const c = customer || SAMPLE_CUSTOMER;
+  const ex = (real, sample) => (real !== undefined && real !== null && String(real).trim() !== "" ? String(real) : isSample ? sample : "");
   const businessName = bp.businessName || extra.businessName || "";
 
   let birthday = c.birthDateRaw || "";
@@ -57,17 +66,15 @@ function buildVariableMap(customer, businessProfile, extra = {}) {
   const soglia =
     extra.threshold != null && extra.threshold !== ""
       ? String(extra.threshold)
-      : c.points != null
-        ? String(c.points)
-        : "100";
+      : ex(c.points, "100");
 
   return {
-    firstName: c.firstName || "Mario",
-    lastName: c.lastName || "Rossi",
-    points: c.points != null ? String(c.points) : "120",
+    firstName: ex(c.firstName, "Mario"),
+    lastName: ex(c.lastName, "Rossi"),
+    points: ex(c.points, "120"),
     businessName,
-    fidelityCardNumber: c.fidelityCardNumber || "FID-12345",
-    birthday: birthday || "15 maggio",
+    fidelityCardNumber: ex(c.fidelityCardNumber, "FID-12345"),
+    birthday: ex(birthday, "15 maggio"),
     reward,
     premio: reward,
     soglia,
@@ -77,7 +84,14 @@ function buildVariableMap(customer, businessProfile, extra = {}) {
 function replaceVariables(text, map) {
   let out = String(text || "");
   Object.entries(map).forEach(([key, val]) => {
-    out = out.split(`{{${key}}}`).join(val);
+    const token = `{{${key}}}`;
+    if (!out.includes(token)) return;
+    if (val === "" || val == null) {
+      // Variabile vuota: si toglie anche lo spazio prima ("Ciao {{firstName}}," → "Ciao,").
+      out = out.replace(new RegExp(`[ \\t\\u00a0]*\\{\\{${key}\\}\\}`, "g"), "");
+    } else {
+      out = out.split(token).join(String(val));
+    }
   });
   return out;
 }
