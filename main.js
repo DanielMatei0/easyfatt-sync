@@ -191,6 +191,51 @@ function showMainWindow() {
   }
 }
 
+/**
+ * Windows: dopo una finestra di sistema (conferma, avviso, scelta file) Electron
+ * può lasciare la pagina senza focus da tastiera. I campi di testo sembrano
+ * "bloccati" finché non si cambia finestra e si torna. Ogni finestra di sistema
+ * passa da qui e, alla chiusura, il focus torna esplicitamente alla pagina.
+ */
+function refocusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (!mainWindow.isFocused()) mainWindow.focus();
+    mainWindow.webContents.focus();
+  } catch {
+    /* ignore */
+  }
+}
+
+for (const name of ["showOpenDialog", "showSaveDialog", "showMessageBox"]) {
+  const original = dialog[name].bind(dialog);
+  dialog[name] = async (...args) => {
+    try {
+      return await original(...args);
+    } finally {
+      setTimeout(refocusMainWindow, 0);
+    }
+  };
+}
+
+// Sostituti di window.confirm / window.alert (vedi renderer/native-dialogs.js).
+ipcMain.on("native-confirm", (event, message) => {
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  const opts = { type: "question", buttons: ["OK", "Annulla"], defaultId: 0, cancelId: 1, noLink: true, message: String(message ?? "") };
+  const choice = parent ? dialog.showMessageBoxSync(parent, opts) : dialog.showMessageBoxSync(opts);
+  setTimeout(refocusMainWindow, 0);
+  event.returnValue = choice === 0;
+});
+
+ipcMain.on("native-alert", (event, message) => {
+  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  const opts = { type: "info", buttons: ["OK"], noLink: true, message: String(message ?? "") };
+  if (parent) dialog.showMessageBoxSync(parent, opts);
+  else dialog.showMessageBoxSync(opts);
+  setTimeout(refocusMainWindow, 0);
+  event.returnValue = true;
+});
+
 function createWindow() {
   const windowIcon = getWindowIconPath();
   console.log("[Easyfatt Sync] Creo la finestra principale...");
@@ -215,6 +260,14 @@ function createWindow() {
   });
   mainWindow.on("closed", () => {
     mainWindow = null;
+  });
+  // Rete di sicurezza: quando la finestra torna in primo piano, la tastiera torna alla pagina.
+  mainWindow.on("focus", () => {
+    try {
+      mainWindow.webContents.focus();
+    } catch {
+      /* ignore */
+    }
   });
   mainWindow.webContents.once("did-finish-load", () => {
     console.log("[Easyfatt Sync] Renderer caricato.");
@@ -1126,7 +1179,7 @@ ipcMain.handle("list-marketing-sends", async (_, params) => {
 });
 
 ipcMain.handle("pick-marketing-logo", async () => {
-  const result = await dialog.showOpenDialog({
+  const result = await dialog.showOpenDialog(mainWindow, {
     title: "Seleziona logo azienda",
     properties: ["openFile"],
     filters: [{ name: "Immagini", extensions: ["png", "jpg", "jpeg", "webp"] }],
