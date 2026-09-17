@@ -95,6 +95,8 @@ function createClient(store, { onUnauthorized } = {}) {
     commit: (runId, customers, events) => call("POST", `/runs/${runId}/commit`, { customers, events }),
     lease: (runId, limit, automation_ids) => call("POST", `/runs/${runId}/lease`, { limit, automation_ids }),
     confirm: (results) => call("POST", "/sends/confirm", { results }),
+    decisions: (runId, decisions) => call("POST", `/runs/${runId}/decisions`, { decisions }),
+    blocked: (body) => call("POST", "/sends/blocked", body),
     deliver: (body) => call("POST", "/sends/deliver", body, { timeoutMs: 60000 }),
     listSends: (params = {}) => call("GET", `/sends?${new URLSearchParams(params)}`),
     sender: (body) => call("POST", "/sender", body, { timeoutMs: 60000 }),

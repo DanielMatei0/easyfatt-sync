@@ -85,6 +85,7 @@ function createCloudService({
     engine,
     log,
     shopId: () => tokenStore.sessionInfo(store)?.shop?.id,
+    deviceName: () => tokenStore.sessionInfo(store)?.device?.name || "questo PC",
     hasCustomerFile: (marketing, automation) => {
       const profile = (marketing.marketingProfiles || []).find((p) => p.id === automation.marketingProfileId);
       const syncProfile = profile && (getAppConfig().syncProfiles || []).find((p) => p.id === profile.syncProfileId);

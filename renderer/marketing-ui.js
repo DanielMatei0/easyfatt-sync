@@ -1072,7 +1072,8 @@
       const rows = (res.items || [])
         .map((h) => {
           const st = SERVER_STATUS[h.status] || { pill: "skipped", label: h.status };
-          const detail = h.last_error && h.status !== "SENT" ? `<br><span class="muted-text">${escapeHtml(h.last_error)}</span>` : "";
+          const blocked = h.blocked_reason && h.status !== "SENT" ? `<br><span class="muted-text">Bloccata: ${escapeHtml(h.blocked_reason)}</span>` : "";
+          const detail = (h.last_error && h.status !== "SENT" ? `<br><span class="muted-text">${escapeHtml(h.last_error)}</span>` : "") + blocked;
           const soglia = h.meta && h.meta.soglia ? ` · soglia ${escapeHtml(String(h.meta.soglia))}` : "";
           return `<tr>
           <td>${escapeHtml(automationLabel(h.automation_id))}${soglia}${h.source === "MIGRATION" ? '<br><span class="muted-text">da versione precedente</span>' : ""}</td>

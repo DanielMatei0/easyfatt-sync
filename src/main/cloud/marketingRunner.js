@@ -37,6 +37,23 @@ function dailyCount(store, now) {
   return d && d.date === todayKey(now) ? Number(d.count) || 0 : 0;
 }
 
+const DECISIONS_KEY = "cloud.decisionsCache";
+
+/** Descrizione breve di un'email creata, per la decisione "riceve". */
+function matchedReason(event) {
+  const kind = event.event_key.split(":")[0];
+  if (kind === "bday") return "Compleanno di oggi: email creata";
+  if (kind === "pts") return `Soglia ${event.meta?.soglia ?? ""} punti superata: email creata`;
+  if (kind === "welc") return "Nuovo iscritto (cliente nuovo o tessera assegnata): benvenuto creato";
+  if (kind === "fpts") return "Primi punti: email creata";
+  if (kind === "inact") return "Cliente inattivo: email creata";
+  return "Email creata";
+}
+
+function decisionHash(d) {
+  return require("crypto").createHash("sha1").update(`${d.category}|${d.code}|${d.reason}|${d.event_key || ""}`).digest("base64").slice(0, 16);
+}
+
 function addDaily(store, now, n) {
   store.set("cloud.dailySends", { date: todayKey(now), count: dailyCount(store, now) + n });
 }
@@ -66,6 +83,49 @@ function createRunner(deps) {
       pending.remove(deps.store, batch.map((r) => r.event_id));
     }
     log(`[Marketing] Confermati ${results.length} esiti rimasti in sospeso.`);
+  }
+
+  /** Manda al server solo le decisioni cambiate dall'ultimo giro (cache locale per negozio). */
+  async function uploadDecisions(run, shopId, decisions, summary) {
+    if (!deps.client.decisions || !decisions.length) return;
+    // Una decisione per cliente e campagna: più soglie superate insieme diventano una riga sola.
+    const merged = new Map();
+    decisions.forEach((d) => {
+      const k = `${d.automation_id}:${d.customer_key}`;
+      const prev = merged.get(k);
+      if (prev && prev.category === "MATCHED" && d.category === "MATCHED") {
+        merged.set(k, { ...prev, reason: `${prev.reason}; ${d.reason}`.slice(0, 300) });
+      } else if (!prev || d.category === "MATCHED") {
+        merged.set(k, d);
+      }
+    });
+    let cache = deps.store.get(DECISIONS_KEY);
+    if (!cache || cache.shopId !== shopId) cache = { shopId, entries: {} };
+    const changed = [...merged.values()].filter((d) => cache.entries[`${d.automation_id}:${d.customer_key}`] !== decisionHash(d));
+    try {
+      for (const part of chunk(changed, 2000)) {
+        await deps.client.decisions(run.id, part);
+        part.forEach((d) => {
+          cache.entries[`${d.automation_id}:${d.customer_key}`] = decisionHash(d);
+        });
+        deps.store.set(DECISIONS_KEY, cache);
+      }
+      summary.decisions = changed.length;
+    } catch (err) {
+      // La tracciabilità non deve mai fermare gli invii: si riprova al prossimo giro.
+      summary.decisionsError = err.message;
+      log(`[Marketing] Motivi dei destinatari non salvati (riprovo al prossimo giro): ${err.message}`);
+    }
+  }
+
+  /** Il giro si ferma prima di inviare: il motivo va sulle email in coda. */
+  async function markBlocked(reason, automationIds) {
+    if (!deps.client.blocked) return;
+    try {
+      await deps.client.blocked({ reason: reason.slice(0, 300), automation_ids: automationIds });
+    } catch {
+      /* se il server non risponde il motivo resta nel riepilogo del giro */
+    }
   }
 
   function selectAutomations(marketing, { syncProfileId, automationIds }) {
@@ -123,6 +183,7 @@ function createRunner(deps) {
     const t = now();
     const commitCustomers = [];
     const candidates = [];
+    const decisions = [];
     let newCustomers = 0;
 
     keys.forEach((key) => {
@@ -152,6 +213,9 @@ function createRunner(deps) {
           lastSentAt: lastSent.get(`${automation.id}:${key}`) || null,
           now: t,
         });
+        if (!r.match) {
+          decisions.push({ automation_id: automation.id, customer_key: key, category: r.category || "EXCLUDED", code: r.code || "excluded", reason: String(r.reason || "Non idoneo").slice(0, 300), event_key: null });
+        }
         r.events.forEach((e) =>
           candidates.push({
             ...e,
@@ -171,6 +235,17 @@ function createRunner(deps) {
       log(`[Marketing] Invii trattenuti per verifica: ${guarded.reasons.join("; ")}.`);
     }
 
+    guarded.events.forEach((e) => {
+      decisions.push({
+        automation_id: e.automation_id,
+        customer_key: e.customer_key,
+        category: "MATCHED",
+        code: e.status === "HELD" ? "held" : "event_created",
+        reason: (e.status === "HELD" ? `${matchedReason(e)} — ${e.hold_reason}` : matchedReason(e)).slice(0, 300),
+        event_key: e.event_key,
+      });
+    });
+
     const eventsByCustomer = new Map();
     guarded.events.forEach((e) => {
       if (!eventsByCustomer.has(e.customer_key)) eventsByCustomer.set(e.customer_key, []);
@@ -184,6 +259,7 @@ function createRunner(deps) {
       summary.queued += res.events_created;
       summary.conflicts += res.conflicts.length;
     }
+    await uploadDecisions(run, shopId, decisions, summary);
     return byKey;
   }
 
@@ -200,6 +276,7 @@ function createRunner(deps) {
       } catch (err) {
         summary.stoppedBy = err.message;
         log(`[Marketing] Invii sospesi: ${err.message}`);
+        await markBlocked(`Gmail non disponibile su ${deps.deviceName ? deps.deviceName() : "questo PC"}: ${err.message}`, autoIds);
         return;
       }
     }
@@ -208,6 +285,7 @@ function createRunner(deps) {
     let budget = Math.min(MAX_SENDS_PER_RUN, MAX_SENDS_PER_DAY - dailyCount(deps.store, t));
     if (budget <= 0) {
       summary.stoppedBy = "Tetto giornaliero di invii raggiunto: si riprende domani.";
+      await markBlocked(`Tetto giornaliero di ${MAX_SENDS_PER_DAY} email Gmail raggiunto: si riprende domani`, autoIds);
       return;
     }
 
@@ -282,6 +360,7 @@ function createRunner(deps) {
             if (rest.length) await deps.client.confirm(rest);
             summary.stoppedBy = "Collegamento Google scaduto: ricollega Google per riprendere gli invii.";
             log(`[Marketing] ${summary.stoppedBy}`);
+            await markBlocked("Collegamento Google scaduto sul PC del negozio: ricollega Google", autoIds);
             return;
           }
         }
@@ -289,7 +368,10 @@ function createRunner(deps) {
       }
       await deps.client.heartbeat(run.id);
     }
-    if (budget <= 0) summary.stoppedBy = summary.stoppedBy || "Tetto di invii raggiunto: il resto parte al prossimo giro.";
+    if (budget <= 0) {
+      summary.stoppedBy = summary.stoppedBy || "Tetto di invii raggiunto: il resto parte al prossimo giro.";
+      await markBlocked(`Massimo ${MAX_SENDS_PER_RUN} email per giro: le altre partono al prossimo giro`, autoIds);
+    }
   }
 
   async function runOnce(options) {

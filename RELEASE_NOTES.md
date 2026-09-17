@@ -1,3 +1,13 @@
+# Easyfatt Sync 26.4.0
+
+## Novità
+
+- **Tracciabilità degli invii**: per ogni cliente e ogni campagna il programma registra se l'email è partita, è in coda o perché non parte (non iscritto alla lista, data di nascita mancante, compleanno non oggi, nessuna soglia superata…). Lo staff Aven la consulta cercando il cliente per email.
+- **Motivo sempre scritto** quando un'email in coda non parte (Google scollegato, tetto giornaliero Gmail raggiunto), quando viene trattenuta per verifica o quando scade.
+- Il salvataggio dei motivi non blocca mai gli invii: se non riesce, si riprova al giro successivo.
+
+---
+
 # Easyfatt Sync 26.3.2
 
 ## Novità

@@ -215,3 +215,87 @@ test("lista = tessera: senza tessera nessuna email; tessera assegnata → un ben
   await s.runner.runMarketing({ trigger: "watch" });
   assert.equal(s.gmail.sent.length, 1, "tessera sostituita: nessun secondo benvenuto");
 });
+
+test("tracciabilità: motivo per ogni cliente e campagna, inviato solo quando cambia", async () => {
+  const born = new Date();
+  const s = setup({
+    rows: [
+      { email: "anna@esempio.it", firstName: "Anna", points: 10, fidelityCardNumber: "T1", birthDate: new Date(1990, born.getMonth(), born.getDate()) },
+      { email: "bruno@esempio.it", firstName: "Bruno", points: 10, fidelityCardNumber: "", birthDate: null },
+    ],
+    automations: [{ id: "auto_bday", type: "birthday" }, pointsAuto],
+  });
+  const { getMarketingConfig } = require("../src/main/marketingConfig");
+  setMarketingConfig(s.store, { ...getMarketingConfig(s.store), marketingListMode: "card" });
+  await s.runner.runMarketing({ trigger: "watch" });
+  const k = (email) => rules.customerKey(SHOP, email);
+  const d = (auto, email) => s.cloud.decisions.get(`${auto}:${k(email)}`);
+  assert.equal(d("auto_bday", "anna@esempio.it").category, "MATCHED");
+  assert.match(d("auto_bday", "anna@esempio.it").reason, /Compleanno di oggi/);
+  assert.ok(d("auto_bday", "anna@esempio.it").event_key.startsWith("bday:"));
+  assert.equal(d("auto_bday", "bruno@esempio.it").code, "not_in_list");
+  assert.equal(d("auto_bday", "bruno@esempio.it").reason, "Non iscritto alla lista: tessera fedeltà assente");
+  assert.equal(d("auto_pts", "anna@esempio.it").category, "NOT_DUE");
+  assert.equal(s.cloud.decisionCalls.reduce((a, b) => a + b, 0), 4);
+
+  // Secondo giro: cambia solo il testo dei punti di Anna ("0 → 10" diventa "10 → 10").
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.cloud.decisionCalls.reduce((a, b) => a + b, 0), 5);
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.cloud.decisionCalls.reduce((a, b) => a + b, 0), 5, "giro identico: nessuna decisione rimandata");
+
+  s.state.rows[0] = { ...s.state.rows[0], points: 35 };
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.cloud.decisionCalls.reduce((a, b) => a + b, 0), 6, "cambiano i punti di Anna: una sola decisione aggiornata");
+  assert.equal(d("auto_pts", "anna@esempio.it").category, "MATCHED");
+});
+
+test("tracciabilità: Google non disponibile → il motivo resta sulle email in coda", async () => {
+  const s = setup({
+    rows: [{ email: "anna@esempio.it", points: 60 }],
+    automations: [pointsAuto],
+    sender: () => ({
+      async preflight() {
+        throw Object.assign(new Error("Permesso Gmail mancante"), { kind: "auth" });
+      },
+      async sendOne() {
+        throw new Error("non deve essere chiamato");
+      },
+    }),
+  });
+  await s.runner.runMarketing({ trigger: "watch" });
+  const queued = [...s.cloud.sends.values()].filter((e) => e.status === "QUEUED");
+  assert.ok(queued.length > 0);
+  assert.ok(queued.every((e) => /Gmail non disponibile.*Permesso Gmail mancante/.test(e.blocked_reason)));
+});
+
+test("tracciabilità: email trattenute con il motivo della guardia", () => {
+  const mk = (i) => ({ automation_id: "auto_w", automation_type: "new_fidelity", event_key: `welc:auto_w:${"a".repeat(64)}:${i}` });
+  const g = rules.applyGuards({ candidates: Array.from({ length: 30 }, (_, i) => mk(i)), knownCount: 50, newCustomerCount: 30, totalCustomers: 80 });
+  assert.ok(g.events.every((e) => e.status === "HELD" && /30 clienti mai visti/.test(e.hold_reason)));
+});
+
+test("tracciabilità: se il salvataggio dei motivi fallisce, le email partono lo stesso", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto] });
+  s.cloud.client.decisions = async () => {
+    throw new Error("server giù per le decisioni");
+  };
+  const r = await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(r.ok, true);
+  assert.equal(s.gmail.sent.length, 2, "le due soglie partono comunque");
+  assert.match(r.summary.decisionsError, /server giù/);
+});
+
+test("tracciabilità: più soglie superate insieme → una decisione sola per cliente e campagna", async () => {
+  const s = setup({ rows: [{ email: "anna@esempio.it", points: 60 }], automations: [pointsAuto] });
+  const sentBatches = [];
+  const orig = s.cloud.client.decisions;
+  s.cloud.client.decisions = async (runId, list) => {
+    sentBatches.push(list);
+    return orig(runId, list);
+  };
+  await s.runner.runMarketing({ trigger: "watch" });
+  const rows = sentBatches.flat().filter((d) => d.automation_id === "auto_pts");
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].reason, /Soglia 30 .*; Soglia 60/);
+});
