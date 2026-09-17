@@ -8,7 +8,7 @@
     { id: "type", label: "Tipo" },
     { id: "basics", label: "Informazioni" },
     { id: "trigger", label: "Trigger" },
-    { id: "consent", label: "Consenso" },
+    { id: "consent", label: "Chi riceve" },
     { id: "preview", label: "Destinatari" },
     { id: "simulate", label: "Simulazione" },
     { id: "activate", label: "Attivazione" },
@@ -92,6 +92,7 @@
         inactiveDays: 90,
         fidelityMode: "new_fidelity",
         requireMarketingConsent: true,
+        audience: "default",
         cooldownDays: 30,
       },
       schedule: { mode: "daily", time: "09:00" },
@@ -596,7 +597,7 @@
         "beforeend",
         `<fieldset class="mkt-radio-cards">
           <legend class="field-label">Modalità trigger</legend>
-          <label class="mkt-radio-card"><input type="radio" name="fidelityMode" value="new_fidelity" ${state.conditions.fidelityMode === "new_fidelity" ? "checked" : ""} /><span><strong>Nuova fidelity</strong><span>Attivazione card oggi o primo contatto.</span></span></label>
+          <label class="mkt-radio-card"><input type="radio" name="fidelityMode" value="new_fidelity" ${state.conditions.fidelityMode === "new_fidelity" ? "checked" : ""} /><span><strong>Nuova tessera</strong><span>Cliente nuovo con tessera, o cliente a cui viene assegnata la tessera.</span></span></label>
           <label class="mkt-radio-card"><input type="radio" name="fidelityMode" value="new_row" ${state.conditions.fidelityMode === "new_row" ? "checked" : ""} /><span><strong>Nuova riga</strong><span>Cliente mai contattato in precedenza.</span></span></label>
           <label class="mkt-radio-card"><input type="radio" name="fidelityMode" value="first_points" ${state.conditions.fidelityMode === "first_points" ? "checked" : ""} /><span><strong>Primi punti</strong><span>Almeno un punto e mai notificato.</span></span></label>
         </fieldset>
@@ -639,25 +640,41 @@
   function renderStepConsent(body) {
     const cfg = getConfig();
     body.innerHTML = `
-      <p class="mkt-auto-wizard-lead">Rispetta il consenso marketing dei clienti (GDPR).</p>
+      <p class="mkt-auto-wizard-lead">Chi riceve questa campagna.</p>
       <div class="mkt-consent-card">
-        <label class="mkt-toggle-card mkt-consent-toggle">
-          <input type="checkbox" id="mAutoWizRequireConsent" ${state.conditions.requireMarketingConsent !== false ? "checked" : ""} />
-          <span class="mkt-toggle-card-body">
-            <strong>Richiedi consenso marketing</strong>
-            <span>Esclude chi non ha acconsentito alle comunicazioni promozionali.</span>
-          </span>
+        <label class="mkt-field">
+          <span class="field-label">Destinatari</span>
+          <select id="mAutoWizAudience" class="mkt-input">
+            <option value="default" ${(state.conditions.audience || "default") === "default" ? "selected" : ""}>Come impostazioni generali (${escapeHtml(({ card: "solo con tessera", consent: "solo con consenso", all: "tutti" })[cfg.marketingListMode || "card"] || "solo con tessera")})</option>
+            <option value="card" ${state.conditions.audience === "card" ? "selected" : ""}>Solo clienti con tessera fedeltà</option>
+            <option value="consent" ${state.conditions.audience === "consent" ? "selected" : ""}>Solo clienti con consenso marketing</option>
+            <option value="all" ${state.conditions.audience === "all" ? "selected" : ""}>Tutti i clienti con email</option>
+          </select>
+          <p class="field-hint">La tessera vale come iscrizione alla lista marketing.</p>
         </label>
+        <div id="mAutoWizConsentBlock">
         <div id="mAutoWizConsentColCombo"></div>
         <label class="mkt-field">
           <span class="field-label">Valori considerati validi</span>
           <textarea id="mAutoWizConsentValues" class="mkt-textarea" rows="4">${escapeHtml((cfg.validConsentValues || []).join("\n"))}</textarea>
           <p class="field-hint">Un valore per riga (es. sì, si, true, 1).</p>
         </label>
+        </div>
       </div>`;
-    $("mAutoWizRequireConsent")?.addEventListener("change", (e) => {
-      state.conditions.requireMarketingConsent = e.target.checked;
+    const effective = () => {
+      const own = state.conditions.audience || "default";
+      return own === "default" ? cfg.marketingListMode || "card" : own;
+    };
+    const syncConsentBlock = () => {
+      const block = $("mAutoWizConsentBlock");
+      if (block) block.hidden = effective() !== "consent";
+    };
+    $("mAutoWizAudience")?.addEventListener("change", (e) => {
+      state.conditions.audience = e.target.value;
+      state.conditions.requireMarketingConsent = effective() === "consent";
+      syncConsentBlock();
     });
+    syncConsentBlock();
     mountCombobox($("mAutoWizConsentColCombo"), {
       label: "Colonna consenso marketing",
       hint: "Colonna Excel con sì/no o equivalente.",

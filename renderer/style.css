@@ -6612,3 +6612,17 @@ body[data-theme="dark"] .mkt-combobox-panel {
 .cloud-password-row .mkt-input {
   flex: 1 1 160px;
 }
+
+/* Campi mostrati solo con la lista "consenso": .mkt-field imposta display e vincerebbe su hidden. */
+#marketingConsentValuesField[hidden],
+#mAutoWizConsentBlock[hidden] {
+  display: none !important;
+}
+
+.mkt-list-mode {
+  border: 0;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}

@@ -191,3 +191,27 @@ test("un altro PC del negozio sta già inviando: questo salta il giro senza erro
   assert.equal(r.ok, true);
   assert.equal(r.reason, "busy_other_device");
 });
+
+test("lista = tessera: senza tessera nessuna email; tessera assegnata → un benvenuto, poi compleanni e soglie", async () => {
+  const s = setup({
+    rows: [{ email: "anna@esempio.it", firstName: "Anna", points: 0, fidelityCardNumber: "" }],
+    automations: [
+      { id: "auto_welc", type: "new_fidelity" },
+      { id: "auto_pts", type: "points_threshold", conditions: { pointsThresholds: [50] } },
+    ],
+  });
+  const { getMarketingConfig } = require("../src/main/marketingConfig");
+  setMarketingConfig(s.store, { ...getMarketingConfig(s.store), marketingListMode: "card" });
+  await s.runner.runMarketing({ trigger: "watch" });
+  s.state.rows = [{ email: "anna@esempio.it", firstName: "Anna", points: 60, fidelityCardNumber: "" }];
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 0, "senza tessera non è in lista: niente soglia");
+  s.state.rows = [{ email: "anna@esempio.it", firstName: "Anna", points: 60, fidelityCardNumber: "T77" }];
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 1, "tessera assegnata: benvenuto (la soglia era già superata prima, niente arretrato)");
+  const keys = [...s.cloud.sends.values()].filter((e) => e.status === "SENT").map((e) => e.event_key.split(":")[0]);
+  assert.deepEqual(keys, ["welc"]);
+  s.state.rows = [{ email: "anna@esempio.it", firstName: "Anna", points: 60, fidelityCardNumber: "T78" }];
+  await s.runner.runMarketing({ trigger: "watch" });
+  assert.equal(s.gmail.sent.length, 1, "tessera sostituita: nessun secondo benvenuto");
+});

@@ -1,3 +1,14 @@
+# Easyfatt Sync 26.3.2
+
+## Novità
+
+- **Lista marketing = tessera fedeltà** (Marketing → Privacy e consensi → *Chi riceve le email*): di base ricevono le email solo i clienti con il codice tessera. Si può scegliere invece il consenso da una colonna del file o tutti i clienti con email.
+- **Ogni campagna** può usare la scelta generale o una sua (es. auguri di compleanno a tutti).
+- **Benvenuto quando viene data la tessera**: parte anche per un cliente già presente a cui viene assegnata la tessera, una sola volta. Chi aveva già la tessera non lo riceve.
+- Nelle anteprime il motivo è esplicito: "Non iscritto alla lista: tessera fedeltà assente".
+
+---
+
 # Easyfatt Sync 26.3.1
 
 ## Problemi risolti

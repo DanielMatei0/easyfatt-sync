@@ -529,7 +529,7 @@
     banner.classList.toggle("mkt-sim-banner-live", real);
     if (real) {
       textWrap.innerHTML =
-        "<strong>Invio reale attivo.</strong> <span>Le automazioni programmate possono inviare email tramite il backend Aven Labs. Per gli invii manuali è richiesta la conferma del consenso marketing.</span>";
+        "<strong>Invio reale attivo.</strong> <span>Le campagne attive partono da sole dopo ogni sincronizzazione del file clienti e agli orari programmati, dal PC collegato all'account Aven.</span>";
     } else {
       textWrap.innerHTML =
         "<strong>Modalità simulazione.</strong> <span>Nessun invio reale: le email vengono preparate e registrate nello storico locale. Abilita l'invio reale in Impostazioni → Dati azienda e brand.</span>";
@@ -1275,9 +1275,12 @@
 
   function renderSenderAndConsent() {
     renderBrandProfile();
-    if ($("marketingRequireConsent")) {
-      $("marketingRequireConsent").checked = marketingConfig?.requireMarketingConsent !== false;
-    }
+    const listMode = marketingConfig?.marketingListMode || "card";
+    document.querySelectorAll('input[name="marketingListMode"]').forEach((r) => {
+      r.checked = r.value === listMode;
+    });
+    const valuesField = $("marketingConsentValuesField");
+    if (valuesField) valuesField.hidden = listMode !== "consent";
     if ($("marketingConsentValues")) {
       $("marketingConsentValues").value = (marketingConfig?.validConsentValues || []).join("\n");
     }
@@ -1601,7 +1604,7 @@
           <li class="mkt-recipient-stat"><span class="stat-label">Totali</span><span class="stat-value">${s.total}</span></li>
           <li class="mkt-recipient-stat" data-tone="success"><span class="stat-label">Validi</span><span class="stat-value">${s.valid}</span></li>
           <li class="mkt-recipient-stat"><span class="stat-label">Senza email</span><span class="stat-value">${s.withoutEmail}</span></li>
-          <li class="mkt-recipient-stat"><span class="stat-label">Senza consenso</span><span class="stat-value">${s.withoutConsent}</span></li>
+          <li class="mkt-recipient-stat"><span class="stat-label">Non in lista</span><span class="stat-value">${s.withoutConsent}</span></li>
           <li class="mkt-recipient-stat"><span class="stat-label">Già contattati</span><span class="stat-value">${s.alreadyContacted ?? 0}</span></li>
           <li class="mkt-recipient-stat"><span class="stat-label">Saltati</span><span class="stat-value">${s.skipped}</span></li>`;
       }
@@ -2205,16 +2208,25 @@
       runSimulation($("marketingSimulateSelect")?.value);
     });
 
+    document.querySelectorAll('input[name="marketingListMode"]').forEach((r) =>
+      r.addEventListener("change", () => {
+        const field = $("marketingConsentValuesField");
+        if (field) field.hidden = r.value !== "consent" || !r.checked;
+      }),
+    );
+
     $("marketingSaveConsentBtn")?.addEventListener("click", async () => {
       const lines = ($("marketingConsentValues")?.value || "")
         .split("\n")
         .map((l) => l.trim().toLowerCase())
         .filter(Boolean);
+      const mode = document.querySelector('input[name="marketingListMode"]:checked')?.value || "card";
       await saveMarketing({
-        requireMarketingConsent: $("marketingRequireConsent")?.checked !== false,
+        marketingListMode: mode,
+        requireMarketingConsent: mode === "consent",
         validConsentValues: lines.length ? lines : undefined,
       });
-      showFeedback($("marketingConsentFeedback"), "Impostazioni consenso salvate.", false);
+      showFeedback($("marketingConsentFeedback"), "Lista marketing salvata.", false);
     });
 
     $("marketingSaveMappingBtn")?.addEventListener("click", async () => {

@@ -344,6 +344,8 @@ function normalizeAutomation(automation) {
         conditions.requireMarketingConsent !== undefined
           ? !!conditions.requireMarketingConsent
           : true,
+      // Destinatari della campagna: "default" = impostazione generale (marketingListMode).
+      audience: ["default", "card", "consent", "all"].includes(conditions.audience) ? conditions.audience : "default",
       cooldownDays:
         conditions.cooldownDays != null ? Math.max(0, Number(conditions.cooldownDays) || 0) : 30,
       birthdayEnabled: conditions.birthdayEnabled !== false,
@@ -469,6 +471,17 @@ function normalizeMarketingConfig(raw) {
   };
   const businessProfile = normalizeBusinessProfile(cfg.businessProfile, legacyFlat);
 
+  // Chi è nella lista marketing. Predefinito: chi ha la tessera fedeltà, se la
+  // colonna tessera è collegata; altrimenti il comportamento di prima (consenso).
+  const cardMapped = profiles.some((p) => String(p.columnMapping?.fidelityCardNumber || "").trim());
+  const marketingListMode = ["card", "consent", "all"].includes(cfg.marketingListMode)
+    ? cfg.marketingListMode
+    : cardMapped
+      ? "card"
+      : cfg.requireMarketingConsent === false
+        ? "all"
+        : "consent";
+
   return {
     enabled: !!cfg.enabled,
     senderName: businessProfile.senderName || String(cfg.senderName || "").trim(),
@@ -479,6 +492,7 @@ function normalizeMarketingConfig(raw) {
     businessProfile,
     requireMarketingConsent:
       cfg.requireMarketingConsent !== undefined ? !!cfg.requireMarketingConsent : true,
+    marketingListMode,
     validConsentValues: consentValues.length ? consentValues : [...DEFAULT_CONSENT_VALUES],
     marketingProfiles: profiles,
     automations,
@@ -514,6 +528,7 @@ const PATCHABLE_KEYS = [
   "businessProfile",
   "requireMarketingConsent",
   "validConsentValues",
+  "marketingListMode",
   "marketingProfiles",
   "automations",
   "templates",
