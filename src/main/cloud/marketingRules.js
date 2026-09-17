@@ -83,15 +83,34 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
 }
 
-function hasMarketingConsent(customer, marketing, automation) {
-  const requireConsent =
-    automation?.conditions?.requireMarketingConsent !== undefined
-      ? automation.conditions.requireMarketingConsent
-      : marketing?.requireMarketingConsent;
-  if (!requireConsent) return true;
+const AUDIENCE_MODES = ["card", "consent", "all"];
+
+function hasCard(customer) {
+  return String(customer?.fidelityCardNumber || "").trim() !== "";
+}
+
+/**
+ * Chi è nella lista marketing, secondo le impostazioni di chi usa il programma:
+ * - "card": ha il codice tessera fedeltà (predefinito: la tessera è l'iscrizione);
+ * - "consent": la colonna consenso ha un valore valido;
+ * - "all": tutti i clienti con email.
+ * Ogni campagna può usare l'impostazione generale ("default") o una sua.
+ */
+function audienceMode(marketing, automation) {
+  const own = automation?.conditions?.audience;
+  if (AUDIENCE_MODES.includes(own)) return own;
+  const general = marketing?.marketingListMode;
+  if (AUDIENCE_MODES.includes(general)) return general;
+  return marketing?.requireMarketingConsent === false ? "all" : "consent";
+}
+
+function audienceCheck(customer, marketing, automation) {
+  const mode = audienceMode(marketing, automation);
+  if (mode === "all") return { ok: true };
+  if (mode === "card") return hasCard(customer) ? { ok: true } : { ok: false, reason: "Non iscritto alla lista: tessera fedeltà assente" };
   const val = String(customer.marketingConsent || "").trim().toLowerCase();
-  if (!val) return false;
-  return (marketing?.validConsentValues || []).map((v) => String(v).trim().toLowerCase()).includes(val);
+  const allowed = (marketing?.validConsentValues || []).map((v) => String(v).trim().toLowerCase());
+  return val && allowed.includes(val) ? { ok: true } : { ok: false, reason: "Consenso marketing assente o non valido" };
 }
 
 function getThresholds(automation) {
@@ -181,7 +200,8 @@ function evaluateCustomer(p) {
   const email = normalizeEmail(customer.email);
   if (!email) return no("Email mancante");
   if (!isValidEmail(email)) return no("Email non valida");
-  if (!hasMarketingConsent(customer, marketing, automation)) return no("Consenso marketing assente o non valido");
+  const audience = audienceCheck(customer, marketing, automation);
+  if (!audience.ok) return no(audience.reason);
   if (!toDate(automation.activatedAt)) return no("Automazione da riattivare");
 
   const auto = safeAutomationId(automation.id);
@@ -246,8 +266,8 @@ function evaluateCustomer(p) {
           events: [{ event_key: `fpts:${auto}:${cust}`, expires_at: inDays(14), meta: { fidelityMode: mode } }],
         };
       }
-      if (mode === "new_fidelity" && !customer.fidelityCardNumber && !customer.fidelityActivatedAt) {
-        return no("Nessun dato fidelity");
+      if (mode === "new_fidelity" && !hasCard(customer) && !customer.fidelityActivatedAt) {
+        return no("Nessuna tessera fedeltà");
       }
       const activatedAt = toDate(automation.activatedAt);
       const cardActivated = toDate(customer.fidelityActivatedAt);
@@ -256,8 +276,14 @@ function evaluateCustomer(p) {
         cardActivated &&
         cardActivated >= new Date(activatedAt.getFullYear(), activatedAt.getMonth(), activatedAt.getDate()) &&
         now.getTime() - cardActivated.getTime() <= WELCOME_ACTIVATION_WINDOW_DAYS * DAY_MS;
-      if (!isRealNewCustomer(state, cardMatch, automation) && !recentActivation) {
-        return no(cardMatch ? "Stessa tessera di un cliente già noto" : "Cliente già presente prima dell'attivazione");
+      // Cliente già noto a cui è stata data la tessera: l'ultima osservazione
+      // (dopo l'attivazione della campagna) era senza tessera, ora c'è.
+      const observedAt = state ? toDate(state.last_observed_at) : null;
+      const cardAssigned =
+        mode === "new_fidelity" && hasCard(customer) && state && !state.card_key && observedAt && observedAt >= activatedAt;
+      if (!isRealNewCustomer(state, cardMatch, automation) && !recentActivation && !cardAssigned) {
+        if (cardMatch) return no("Stessa tessera di un cliente già noto");
+        return no(state && state.card_key ? "Tessera già presente prima dell'attivazione" : "Cliente già presente prima dell'attivazione");
       }
       return {
         match: true,
@@ -322,6 +348,9 @@ function applyGuards({ candidates, knownCount, newCustomerCount, totalCustomers 
 }
 
 module.exports = {
+  AUDIENCE_MODES,
+  audienceMode,
+  audienceCheck,
   sha256,
   normalizeEmail,
   customerKey,

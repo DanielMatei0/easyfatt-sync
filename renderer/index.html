@@ -1031,7 +1031,7 @@
                 <div class="mkt-card-head">
                   <div>
                     <h2 class="sync-hero-title">Consensi marketing</h2>
-                    <p class="sync-hero-desc">Gestisci le regole usate per escludere chi non ha dato consenso.</p>
+                    <p class="sync-hero-desc">Decidi chi fa parte della lista marketing e riceve le email.</p>
                   </div>
                   <button type="button" class="btn btn-ghost btn-sm" data-mkt-jump="setup">Torna alle impostazioni</button>
                 </div>
@@ -1041,20 +1041,19 @@
                   </span>
                   <p>Assicurati di avere il consenso dei destinatari prima di inviare comunicazioni marketing.</p>
                 </aside>
-                <label class="check-item mkt-check">
-                  <input type="checkbox" id="marketingRequireConsent" checked />
-                  <span class="check-box" aria-hidden="true"></span>
-                  <span class="check-text">
-                    <span class="check-title">Invia solo a clienti con consenso marketing</span>
-                    <span class="check-desc">I destinatari senza consenso valido verranno esclusi dall’anteprima e dalla simulazione.</span>
-                  </span>
-                </label>
-                <label class="mkt-field">
+                <fieldset class="mkt-list-mode">
+                  <legend class="field-label">Chi riceve le email</legend>
+                  <label class="mkt-radio-card"><input type="radio" name="marketingListMode" value="card" /><span><strong>Solo clienti con tessera fedeltà</strong><span>Avere il codice tessera vale come iscrizione alla lista marketing.</span></span></label>
+                  <label class="mkt-radio-card"><input type="radio" name="marketingListMode" value="consent" /><span><strong>Solo clienti con consenso marketing</strong><span>Serve una colonna consenso con uno dei valori indicati sotto.</span></span></label>
+                  <label class="mkt-radio-card"><input type="radio" name="marketingListMode" value="all" /><span><strong>Tutti i clienti con email</strong><span>Nessun filtro: usalo solo se hai il consenso di tutti.</span></span></label>
+                  <p class="field-hint">Ogni campagna può usare questa scelta o impostarne una diversa.</p>
+                </fieldset>
+                <label class="mkt-field" id="marketingConsentValuesField">
                   <span class="field-label">Valori colonna consenso considerati validi</span>
                   <textarea id="marketingConsentValues" class="mkt-textarea" rows="6" placeholder="sì&#10;si&#10;true&#10;1&#10;yes&#10;autorizzato"></textarea>
                   <p class="field-hint">Un valore per riga, senza distinzione tra maiuscole e minuscole.</p>
                 </label>
-                <button type="button" id="marketingSaveConsentBtn" class="btn btn-primary">Salva consensi</button>
+                <button type="button" id="marketingSaveConsentBtn" class="btn btn-primary">Salva lista marketing</button>
                 <p id="marketingConsentFeedback" class="mkt-form-feedback" hidden role="status"></p>
               </section>
             </div>

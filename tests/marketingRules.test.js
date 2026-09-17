@@ -33,6 +33,7 @@ function fakeServer() {
           });
         });
         customers.set(key, {
+          card_key: R.cardKey(SHOP, row.fidelityCardNumber),
           first_seen_at: state ? state.first_seen_at : now.toISOString(),
           last_points: next.points,
           last_observed_at: now.toISOString(),
@@ -107,9 +108,10 @@ test("29 febbraio festeggiato il 28 negli anni non bisestili", () => {
 
 test("benvenuto: clienti già presenti prima dell'attivazione non lo ricevono", () => {
   const a = auto("new_fidelity");
-  const state = { first_seen_at: "2026-08-01T00:00:00Z", last_points: 100, last_observed_at: "2026-09-10T00:00:00Z", points_rearm: {} };
+  const state = { first_seen_at: "2026-08-01T00:00:00Z", card_key: R.cardKey(SHOP, "T1"), last_points: 100, last_observed_at: "2026-09-10T00:00:00Z", points_rearm: {} };
   const r = R.evaluateCustomer({ customer: customer(), automation: a, marketing: MARKETING, shopId: SHOP, state, cardMatch: false, nextState: {}, lastSentAt: null, now: NOW });
   assert.equal(r.match, false);
+  assert.match(r.reason, /Tessera già presente/);
 });
 
 test("benvenuto: cliente nuovo una volta sola; stessa tessera con email diversa no", () => {
@@ -179,4 +181,46 @@ test("guardie: troppi clienti nuovi trattengono i benvenuti, non i compleanni", 
 test("chiave cliente: stessa email in maiuscolo, stesso cliente; negozi diversi, chiavi diverse", () => {
   assert.equal(R.customerKey(SHOP, " Anna@Esempio.it "), R.customerKey(SHOP, "anna@esempio.it"));
   assert.notEqual(R.customerKey("altro", "anna@esempio.it"), R.customerKey(SHOP, "anna@esempio.it"));
+});
+
+test("benvenuto a un cliente già noto quando riceve la tessera, una volta sola", () => {
+  const s = fakeServer();
+  const a = auto("new_fidelity");
+  // Visto dopo l'attivazione, senza tessera: niente benvenuto.
+  assert.equal(s.run([customer({ fidelityCardNumber: "" })], [a], NOW).length, 0);
+  // Gli viene assegnata la tessera: benvenuto.
+  assert.equal(s.run([customer({ fidelityCardNumber: "T900" })], [a], later(24)).length, 1);
+  // Tessera sostituita o tolta e rimessa: nessun secondo benvenuto.
+  assert.equal(s.run([customer({ fidelityCardNumber: "T901" })], [a], later(48)).length, 0);
+  s.run([customer({ fidelityCardNumber: "" })], [a], later(72));
+  assert.equal(s.run([customer({ fidelityCardNumber: "T902" })], [a], later(96)).length, 0);
+});
+
+test("clienti con tessera già al momento dell'attivazione: nessun benvenuto", () => {
+  const s = fakeServer();
+  const a = auto("new_fidelity", {}, { activatedAt: later(1).toISOString() });
+  s.customers.set(R.customerKey(SHOP, "anna@esempio.it"), { card_key: R.cardKey(SHOP, "T1"), first_seen_at: NOW.toISOString(), last_points: 0, last_observed_at: NOW.toISOString(), points_rearm: {} });
+  assert.equal(s.run([customer()], [a], later(2)).length, 0);
+  assert.equal(s.run([customer()], [a], later(30)).length, 0);
+});
+
+test("lista marketing: predefinito tessera, scelta generale e per campagna", () => {
+  const base = { automation: auto("birthday"), shopId: SHOP, state: null, cardMatch: false, nextState: {}, lastSentAt: null, now: NOW };
+  const born = new Date(1990, 8, 15);
+  const noCard = customer({ fidelityCardNumber: "", marketingConsent: "", birthDate: born });
+  const withCard = customer({ fidelityCardNumber: "T5", marketingConsent: "", birthDate: born });
+  const card = { marketingListMode: "card", validConsentValues: ["si"] };
+  let r = R.evaluateCustomer({ ...base, marketing: card, customer: noCard });
+  assert.equal(r.match, false);
+  assert.equal(r.reason, "Non iscritto alla lista: tessera fedeltà assente");
+  assert.equal(R.evaluateCustomer({ ...base, marketing: card, customer: withCard }).match, true);
+  // Chi usa il programma può scegliere "tutti" in generale…
+  assert.equal(R.evaluateCustomer({ ...base, marketing: { marketingListMode: "all" }, customer: noCard }).match, true);
+  // …o solo per una campagna.
+  const bdayAll = auto("birthday", { audience: "all" });
+  assert.equal(R.evaluateCustomer({ ...base, automation: bdayAll, marketing: card, customer: noCard }).match, true);
+  // Consenso da colonna, come prima.
+  const consent = { marketingListMode: "consent", validConsentValues: ["si"] };
+  assert.equal(R.evaluateCustomer({ ...base, marketing: consent, customer: withCard }).reason, "Consenso marketing assente o non valido");
+  assert.equal(R.evaluateCustomer({ ...base, marketing: consent, customer: customer({ marketingConsent: "SI", birthDate: born }) }).match, true);
 });
