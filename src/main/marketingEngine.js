@@ -3,9 +3,20 @@ const { findProfile } = require("./syncState");
 const { getMarketingConfig, createId, normalizeAutomation } = require("./marketingConfig");
 const { buildVariableMap, getBusinessProfile } = require("./emailTemplateRenderer");
 
+function excelSerialToDate(num) {
+  const excelEpoch = new Date(1899, 11, 30);
+  const d = new Date(excelEpoch.getTime() + num * 86400000);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function parseDate(value) {
   if (value == null || value === "") return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  // Cella data di Excel (anche formattata gg/mm): è un numero di giorni.
+  // Qualsiasi anno, anche nati prima del 1954 (numeri sotto 20000).
+  if (typeof value === "number" && Number.isFinite(value) && value >= 1 && value < 2958466) {
+    return excelSerialToDate(Math.floor(value));
+  }
 
   const s = String(value).trim();
   if (!s) return null;
@@ -21,15 +32,27 @@ function parseDate(value) {
     if (!Number.isNaN(d.getTime())) return d;
   }
 
+  // Compleanno senza anno ("26/06"): conta solo giorno e mese; anno 2000 (bisestile) per tenere il 29/02.
+  const dm = /^(\d{1,2})[\/\-.](\d{1,2})$/.exec(s);
+  if (dm) {
+    const day = Number(dm[1]);
+    const month = Number(dm[2]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const d = new Date(2000, month - 1, day);
+      if (d.getMonth() === month - 1) return d;
+    }
+    return null;
+  }
+
   const num = Number(s);
   if (!Number.isNaN(num) && num > 20000 && num < 60000) {
-    const excelEpoch = new Date(1899, 11, 30);
-    const d = new Date(excelEpoch.getTime() + num * 86400000);
-    if (!Number.isNaN(d.getTime())) return d;
+    return excelSerialToDate(num);
   }
 
   const fallback = new Date(s);
-  return Number.isNaN(fallback.getTime()) ? null : fallback;
+  if (Number.isNaN(fallback.getTime())) return null;
+  const year = fallback.getFullYear();
+  return year >= 1900 && year <= 2100 ? fallback : null;
 }
 
 function parseNumber(value) {
