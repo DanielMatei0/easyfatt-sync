@@ -6593,10 +6593,9 @@ body[data-theme="dark"] .mkt-combobox-panel {
   font-size: 13px;
 }
 
-.cloud-error[hidden],
-.cloud-steps[hidden],
-.cloud-password[hidden] {
-  display: none;
+/* .btn imposta display: inline-flex e vincerebbe sull'attributo hidden. */
+.cloud-account [hidden] {
+  display: none !important;
 }
 
 .cloud-password {
