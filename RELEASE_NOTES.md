@@ -18,6 +18,8 @@
 - Simulazioni e anteprime non vengono più contate come invii.
 - L'app non riattiva più da sola l'invio reale.
 - Oltre 50 destinatari: partono tutti, nei giri successivi se serve (rispettando i limiti di Gmail).
+- **Windows: campi di testo bloccati** dopo una conferma, un avviso o la scelta di un file: la tastiera torna subito alla finestra.
+- Le campagne modificate da un altro PC (anche da remoto) arrivano entro un minuto, senza riavviare l'app; un PC senza il file clienti resta in "solo gestione" e non invia.
 
 ---
 
