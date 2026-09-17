@@ -7,6 +7,8 @@ function onUpdateEvent(channel, callback) {
 }
 
 contextBridge.exposeInMainWorld("easyfattSync", {
+  confirmSync: (message) => ipcRenderer.sendSync("native-confirm", String(message ?? "")),
+  alertSync: (message) => ipcRenderer.sendSync("native-alert", String(message ?? "")),
   getConfig: () => ipcRenderer.invoke("get-config"),
   saveConfig: (config) => ipcRenderer.invoke("save-config", config),
   selectExcel: () => ipcRenderer.invoke("select-excel"),
