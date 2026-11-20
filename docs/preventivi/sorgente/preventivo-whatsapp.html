@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Preventivo integrazione WhatsApp — Easyfatt Sync</title>
+<style>
+  @page { size: A4; margin: 16mm 16mm 18mm 16mm; }
+  :root { --accent:#ff7a00; --ink:#14161a; --muted:#656b76; --soft:#f5f6f8; --border:#e7e9ee; --dark:#111318; }
+  * { box-sizing: border-box; }
+  body { font-family: "Inter", Arial, sans-serif; color: var(--ink); font-size: 9.6pt; line-height: 1.5; margin: 0; }
+  .page-break { break-before: page; }
+
+  /* Header */
+  .hero { background: linear-gradient(135deg, #111318 0%, #1d222b 62%, #ff7a00 175%); color:#fff; border-radius: 16px; padding: 9mm 10mm; display:flex; justify-content:space-between; align-items:flex-start; }
+  .brand { display:flex; align-items:center; gap: 4mm; }
+  .brand img { width: 15mm; height: 15mm; }
+  .brand .name { font-size: 15pt; font-weight: 800; letter-spacing: -0.3px; }
+  .brand .sub { font-size: 8.5pt; color: #b9bec8; }
+  .doc-meta { text-align:right; }
+  .doc-meta .kind { font-size: 8pt; letter-spacing: 2.5px; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  .doc-meta .title { font-size: 20pt; font-weight: 800; letter-spacing: -0.6px; line-height: 1.1; margin-top: 1mm; }
+  .doc-meta .dates { font-size: 8.5pt; color:#c9ced8; margin-top: 2mm; }
+
+  .parties { display:grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin: 6mm 0 5mm; }
+  .party { border:1px solid var(--border); border-radius: 12px; padding: 4mm 5mm; }
+  .party .lbl { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); font-weight: 700; margin-bottom: 1.5mm; }
+  .party .val { font-weight: 600; }
+  .party .line { border-bottom: 1px solid #c9ced8; height: 6mm; }
+
+  h2 { font-size: 13.5pt; letter-spacing: -0.3px; margin: 7mm 0 3mm; padding-bottom: 1.8mm; border-bottom: 2px solid var(--accent); break-after: avoid; }
+  h3 { font-size: 11pt; margin: 5mm 0 2mm; break-after: avoid; }
+  p { margin: 0 0 3mm; }
+  .lead { font-size: 10.5pt; }
+  .muted { color: var(--muted); }
+
+  /* Option cards */
+  .cards { display:grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin-top: 4mm; }
+  .card { border: 1px solid var(--border); border-radius: 14px; padding: 5mm; display:flex; flex-direction:column; break-inside: avoid; }
+  .card.dark { background: var(--dark); color:#fff; border-color: var(--dark); }
+  .card .tag { font-size: 7.5pt; font-weight: 800; letter-spacing: 2px; color: var(--accent); }
+  .card .cname { font-size: 12pt; font-weight: 800; margin: 1mm 0 3mm; letter-spacing:-0.2px; }
+  .card .price { font-size: 22pt; font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+  .card .price small { font-size: 8pt; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .card.dark .price small { color:#9aa0ab; }
+  .card .fee { margin-top: 2mm; font-weight: 700; }
+  .card .fee span { font-weight: 500; color: var(--muted); }
+  .card.dark .fee span { color:#9aa0ab; }
+  .card ul { margin: 3.5mm 0 0; padding-left: 4.5mm; font-size: 8.8pt; }
+  .card li { margin-bottom: 1.2mm; }
+  .card .time { margin-top: auto; padding-top: 3mm; font-size: 8pt; color: var(--muted); border-top: 1px solid var(--border); }
+  .card.dark .time { border-color:#2a2f3a; color:#9aa0ab; }
+  .card ul li::marker { color: var(--accent); }
+
+  .note-box { background:#fff7ef; border-left: 4px solid var(--accent); border-radius: 10px; padding: 3mm 4.5mm; margin: 4mm 0; color:#3a2a1d; font-size: 9pt; }
+
+  /* Tables */
+  table { width:100%; border-collapse: collapse; margin: 3mm 0 4mm; font-size: 8.6pt; border: 1px solid var(--border); break-inside: auto; }
+  th { background: var(--dark); color:#fff; text-align:left; padding: 2.4mm 2.8mm; font-weight: 700; }
+  td { padding: 2.2mm 2.8mm; border-top: 1px solid var(--border); vertical-align: top; }
+  tr { break-inside: avoid; }
+  tbody tr:nth-child(even) td { background: var(--soft); }
+  td:first-child { font-weight: 600; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr.total td { background: #fff7ef !important; font-weight: 700; }
+
+  ul.check { list-style: none; padding-left: 0; margin: 0; columns: 2; column-gap: 8mm; }
+  ul.check li { padding-left: 6mm; position: relative; margin-bottom: 2mm; break-inside: avoid; }
+  ul.check li::before { content: ""; position:absolute; left:0; top: 1mm; width: 3mm; height: 3mm; border: 1.5px solid var(--accent); border-radius: 3px; }
+
+  ol.terms { padding-left: 5mm; margin: 0; }
+  ol.terms li { margin-bottom: 1.6mm; }
+
+  .sign { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 6mm; margin-top: 6mm; break-inside: avoid; }
+  .sign .box { border-top: 1px solid var(--ink); padding-top: 1.5mm; font-size: 8pt; color: var(--muted); height: 16mm; }
+  .choice { display:flex; gap: 8mm; margin-top: 3mm; font-weight: 600; }
+  .choice span::before { content:""; display:inline-block; width:3.2mm; height:3.2mm; border:1.5px solid var(--ink); border-radius:2px; margin-right:2mm; vertical-align:-0.5mm; }
+  .keep { break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="brand">
+    <img src="logo.svg" alt="">
+    <div>
+      <div class="name">Aven Labs</div>
+      <div class="sub">aven-labs.com · support@aven-labs.com</div>
+    </div>
+  </div>
+  <div class="doc-meta">
+    <div class="kind">Preventivo</div>
+    <div class="title">Integrazione WhatsApp<br>in Easyfatt Sync</div>
+    <div class="dates">Data 20/11/2026 · Valido 30 giorni</div>
+  </div>
+</div>
+
+<div class="parties">
+  <div class="party"><div class="lbl">Fornitore</div><div class="val">Aven Labs</div><div class="muted">Sviluppatore di Easyfatt Sync</div></div>
+  <div class="party"><div class="lbl">Cliente</div><div class="line"></div><div class="line"></div></div>
+</div>
+
+<p class="lead">I messaggi che Easyfatt Sync oggi invia per email — compleanno, soglia punti, benvenuto fidelity, cliente inattivo — partono anche su <strong>WhatsApp dal numero fisso del negozio</strong>. In tutte le soluzioni WhatsApp è integrato nell'app: le risposte dei clienti arrivano in una nuova sezione <strong>Chat WhatsApp</strong> e si risponde direttamente da Easyfatt Sync.</p>
+
+<h2>Le tre soluzioni</h2>
+<div class="cards">
+  <div class="card">
+    <div class="tag">OPZIONE A</div>
+    <div class="cname">WhatsApp</div>
+    <div class="price">890 € <small>una tantum</small></div>
+    <div class="fee">15 € <span>/ mese</span></div>
+    <ul>
+      <li>Automazioni su WhatsApp, scelta email o WhatsApp per ognuna</li>
+      <li>Chat integrata: conversazioni, risposte dei clienti, notifica sul PC</li>
+      <li>4 modelli messaggio preparati e fatti approvare</li>
+      <li>Consenso WhatsApp e disiscrizione automatica</li>
+      <li>Registro invii: inviato, consegnato, letto, errore</li>
+    </ul>
+    <div class="time">Attivazione in 2 settimane</div>
+  </div>
+  <div class="card">
+    <div class="tag">OPZIONE B</div>
+    <div class="cname">WhatsApp + AI base</div>
+    <div class="price">1.200 € <small>una tantum</small></div>
+    <div class="fee">30 € <span>/ mese · AI inclusa</span></div>
+    <ul>
+      <li>Tutto quello dell'opzione A</li>
+      <li>L'AI suggerisce la risposta, si invia con un clic</li>
+      <li>Risposte automatiche fuori orario a domande fisse (orari, indirizzo)</li>
+    </ul>
+    <div class="time">Attivazione in 3 settimane</div>
+  </div>
+  <div class="card dark">
+    <div class="tag">OPZIONE C</div>
+    <div class="cname">WhatsApp evoluto</div>
+    <div class="price">1.900 € <small>una tantum</small></div>
+    <div class="fee">30 € <span>/ mese · AI inclusa</span></div>
+    <ul>
+      <li>Tutto quello dell'opzione B</li>
+      <li>L'AI risponde da sola con i dati del cliente (saldo punti, premi) e passa la chat quando serve</li>
+      <li>Scheda cliente accanto alla chat</li>
+      <li>Editor modelli con anteprima + 6 modelli</li>
+      <li>Email di riserva e statistiche di letture e risposte</li>
+    </ul>
+    <div class="time">Attivazione in 4–5 settimane</div>
+  </div>
+</div>
+<div class="note-box"><strong>Coesistenza con l'app WhatsApp sul telefono:</strong> +10 € al mese su qualsiasi opzione. Prezzi IVA esclusa. I costi dei messaggi Meta sono a parte e indicati più avanti.</div>
+
+<div class="page-break"></div>
+<h2>Confronto nel dettaglio</h2>
+<table>
+  <thead><tr><th style="width:20%"></th><th>A — WhatsApp</th><th>B — WhatsApp + AI base</th><th>C — WhatsApp evoluto</th></tr></thead>
+  <tbody>
+    <tr><td>Automazioni su WhatsApp</td><td>Compleanno, soglia punti, benvenuto fidelity, inattivo, personalizzata</td><td>Come A</td><td>Come A</td></tr>
+    <tr><td>Canale per automazione</td><td>Email o WhatsApp</td><td>Come A</td><td>Email, WhatsApp, o WhatsApp con email di riserva</td></tr>
+    <tr><td>Chat in app</td><td>Elenco conversazioni, risposte dei clienti, risposta in chat, notifica sul PC</td><td>Come A</td><td>Come A, più scheda cliente (punti, tessera, ultimo acquisto)</td></tr>
+    <tr><td>Intelligenza artificiale</td><td>—</td><td>Suggerisce la risposta; risposte automatiche a domande fisse fuori orario</td><td>Risponde da sola anche con i dati del cliente e passa la chat quando serve</td></tr>
+    <tr><td>Modelli messaggio</td><td>4 modelli preparati e fatti approvare da noi</td><td>4 modelli</td><td>Editor nell'app con anteprima + 6 modelli</td></tr>
+    <tr><td>Consenso e disiscrizione</td><td>Colonna consenso WhatsApp, pulsante "Non voglio più messaggi"</td><td>Come A</td><td>Come A</td></tr>
+    <tr><td>Registro invii</td><td>Inviato, consegnato, letto, errore con motivo</td><td>Come A</td><td>Come A, più statistiche per automazione</td></tr>
+    <tr class="total"><td>Una tantum</td><td>890 €</td><td>1.200 €</td><td>1.900 €</td></tr>
+    <tr class="total"><td>Canone mensile</td><td>15 €</td><td>30 € (AI inclusa)</td><td>30 € (AI inclusa)</td></tr>
+    <tr><td>Con coesistenza</td><td>+10 €/mese</td><td>+10 €/mese</td><td>+10 €/mese</td></tr>
+    <tr><td>Tempi</td><td>2 settimane</td><td>3 settimane</td><td>4–5 settimane</td></tr>
+  </tbody>
+</table>
+<p class="muted">Il canone copre server, monitoraggio, aggiornamenti dei modelli, adeguamenti alle regole Meta e, nelle opzioni B e C, il servizio AI. I tempi includono l'approvazione Meta dell'account e dei modelli (di solito 1–5 giorni lavorativi). Si può partire dalla A e passare a B o C in seguito pagando la differenza.</p>
+
+<div class="keep">
+<h2>Numero fisso: due soluzioni</h2>
+<p>Valgono per tutte le opzioni; si sceglie all'attivazione e si può cambiare in seguito. Il fisso viene verificato da Meta con una chiamata vocale automatica.</p>
+<table>
+  <thead><tr><th style="width:24%"></th><th>1 — Solo Easyfatt Sync</th><th>2 — Coesistenza con l'app</th></tr></thead>
+  <tbody>
+    <tr><td>Come funziona</td><td>Il fisso è collegato direttamente alla piattaforma Meta; tutte le chat si gestiscono da Easyfatt Sync</td><td>Il fisso resta anche sull'app WhatsApp Business del telefono, collegato tramite SendSeven</td></tr>
+    <tr><td>Dove si risponde</td><td>Dal PC, in Easyfatt Sync</td><td>Dal PC in Easyfatt Sync e dal telefono, sulle stesse chat</td></tr>
+    <tr><td>Se il fisso è già su WhatsApp</td><td>Esce dall'app del telefono</td><td>Resta sull'app; si importano fino a 6 mesi di chat</td></tr>
+    <tr><td>Limiti</td><td>Nessuno per i volumi di un negozio</td><td>Nell'app non si creano più liste broadcast; massimo 20 messaggi al secondo</td></tr>
+    <tr class="total"><td>Costo aggiuntivo</td><td>—</td><td>+10 € al mese</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Costi per messaggio</h2>
+<p>Meta addebita i messaggi inviati con un modello approvato, con prezzo per categoria. La fattura Meta arriva direttamente al cliente, senza ricarichi. Il costo AI è indicato per trasparenza: nelle opzioni B e C è già compreso nel canone.</p>
+<table>
+  <thead><tr><th>Tipo di messaggio</th><th>Esempio</th><th>Opzioni</th><th class="num">Costo</th></tr></thead>
+  <tbody>
+    <tr><td>Automatico marketing</td><td>Auguri di compleanno, cliente inattivo, promozione</td><td>A, B, C</td><td class="num">0,0658 €</td></tr>
+    <tr><td>Automatico utility</td><td>Benvenuto fidelity, saldo punti senza promozione</td><td>A, B, C</td><td class="num">0,0248 €</td></tr>
+    <tr><td>Ricontatto dopo 24 ore</td><td>Modello scelto in chat</td><td>A, B, C</td><td class="num">0,0248–0,0658 €</td></tr>
+    <tr><td>Messaggio ricevuto</td><td>Qualsiasi risposta o domanda del cliente</td><td>A, B, C</td><td class="num">gratis</td></tr>
+    <tr><td>Risposta in chat entro 24 ore</td><td>Scritta dal negozio o dall'AI</td><td>A, B, C</td><td class="num">gratis fino a 1.000/mese</td></tr>
+    <tr><td>Risposta AI base</td><td>Suggerimento o risposta a domanda fissa</td><td>B</td><td class="num">&lt; 0,001 € · incluso</td></tr>
+    <tr><td>Risposta AI evoluta</td><td>Risposta con i dati del cliente</td><td>C</td><td class="num">0,015–0,03 € · incluso</td></tr>
+  </tbody>
+</table>
+
+<div class="keep">
+<h3>Esempio di un mese tipo</h3>
+<p>Circa 1.000 clienti con consenso: 300 messaggi automatici (225 marketing, 75 utility) e 150 risposte in chat entro 24 ore.</p>
+<table>
+  <thead><tr><th>Opzione</th><th class="num">Meta</th><th class="num">Canone</th><th class="num">Totale al mese</th><th class="num">Con coesistenza</th></tr></thead>
+  <tbody>
+    <tr><td>A — WhatsApp</td><td class="num">16,67 €</td><td class="num">15 €</td><td class="num"><strong>≈ 32 €</strong></td><td class="num">≈ 42 €</td></tr>
+    <tr><td>B — WhatsApp + AI base</td><td class="num">16,67 €</td><td class="num">30 €</td><td class="num"><strong>≈ 47 €</strong></td><td class="num">≈ 57 €</td></tr>
+    <tr><td>C — WhatsApp evoluto</td><td class="num">16,67 €</td><td class="num">30 €</td><td class="num"><strong>≈ 47 €</strong></td><td class="num">≈ 57 €</td></tr>
+  </tbody>
+</table>
+<p class="muted">Meta stabilisce la categoria all'approvazione del modello: auguri, sconti e inviti a tornare sono di norma marketing. Nel caso in cui siano tutti marketing, i 300 messaggi costano 19,74 €. Tariffe Meta per l'Italia in vigore a novembre 2026, soggette a variazione da parte di Meta.</p>
+</div>
+
+<div class="keep">
+<h2>Cosa serve per partire</h2>
+<ul class="check">
+  <li>Account Meta Business a nome dell'attività, con Aven Labs aggiunta come partner</li>
+  <li>Verifica aziendale Meta: visura camerale, sito o dominio, email aziendale (senza verifica il limite è 250 destinatari al giorno)</li>
+  <li>Carta di pagamento intestata all'attività per i costi Meta</li>
+  <li>10 minuti di accesso al fisso per la verifica (menu vocale disattivato o inoltro a un cellulare)</li>
+  <li>Nome visualizzato e logo per il profilo WhatsApp</li>
+  <li>Cellulare e consenso WhatsApp dei clienti in Easyfatt; informativa privacy aggiornata</li>
+  <li>Opzioni B e C: domande frequenti e risposte (orari, regolamento fidelity, resi)</li>
+  <li>Con coesistenza: app WhatsApp Business già attiva sul fisso</li>
+</ul>
+</div>
+
+<div class="keep">
+<h2>Condizioni</h2>
+<ol class="terms">
+  <li>Prezzi in euro, IVA esclusa. Offerta valida 30 giorni dalla data del preventivo.</li>
+  <li>Pagamento una tantum: 50% all'ordine, 50% all'attivazione. Canone mensile dal mese di attivazione.</li>
+  <li>I costi dei messaggi Meta sono fatturati direttamente da Meta al cliente e non sono compresi nei prezzi.</li>
+  <li>La coesistenza è soggetta all'accettazione del numero da parte di Meta e SendSeven.</li>
+  <li>I tempi decorrono dalla ricezione di quanto indicato in "Cosa serve per partire".</li>
+</ol>
+</div>
+
+<div class="keep">
+<h2>Accettazione</h2>
+<p>Il cliente sceglie la soluzione:</p>
+<div class="choice"><span>Opzione A</span><span>Opzione B</span><span>Opzione C</span><span>+ Coesistenza</span></div>
+<div class="sign">
+  <div class="box">Luogo e data</div>
+  <div class="box">Timbro</div>
+  <div class="box">Firma del cliente</div>
+</div>
+</div>
+
+</body>
+</html>
